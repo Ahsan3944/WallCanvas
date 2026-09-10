@@ -71,15 +71,22 @@ public final class PaperPaintingListener implements Listener {
                 && byEntity.getRemover() instanceof Player player
                 && player.getGameMode().isCreative()) {
             removeFromStore(painting);
+            painting.remove();
             return;
         }
 
         try {
+            String assetId = painting.getPersistentDataContainer().get(assetKey, PersistentDataType.STRING);
+            if (assetId == null || assetId.isBlank()) {
+                plugin.getLogger().warning("WallCanvas Painting " + painting.getUniqueId()
+                        + " has no asset metadata; keeping it intact.");
+                return;
+            }
             PaintingSize size = sizeFor(painting);
-            ItemStack item = paintingItems.create(new PaintingSpec(
-                    painting.getPersistentDataContainer().get(assetKey, PersistentDataType.STRING), size));
+            ItemStack item = paintingItems.create(new PaintingSpec(assetId, size));
             painting.getWorld().dropItemNaturally(painting.getLocation(), item);
             removeFromStore(painting);
+            painting.remove();
         } catch (Exception exception) {
             event.setCancelled(false);
             plugin.getLogger().warning("Unable to create WallCanvas Painting drop for "
