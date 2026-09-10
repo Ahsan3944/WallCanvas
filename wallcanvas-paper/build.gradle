@@ -1,0 +1,23 @@
+plugins {
+    id 'java'
+}
+
+base {
+    archivesName = 'wallcanvas-paper'
+}
+
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:${project.paper_api_version}"
+    implementation project(':wallcanvas-core')
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('plugin.yml') {
+        expand 'version': project.version
+    }
+}
+
+jar {
+    from(project(':wallcanvas-core').sourceSets.main.output)
+}
