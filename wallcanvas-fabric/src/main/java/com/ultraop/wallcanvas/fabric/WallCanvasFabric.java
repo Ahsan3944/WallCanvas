@@ -74,7 +74,7 @@ public final class WallCanvasFabric implements ModInitializer {
                                                                 "Gave WallCanvas Painting '" + pictureName + "' to " + target.getName().getString() + "."), true);
                                                     }
                                                     return 1;
-                                                }))));
+                                                })))));
     }
 
     private int listPictures(MinecraftServer server) {
