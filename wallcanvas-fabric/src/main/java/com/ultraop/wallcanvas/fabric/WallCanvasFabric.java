@@ -94,30 +94,32 @@ public final class WallCanvasFabric implements ModInitializer {
                                         for (String name : pictureNames()) builder.suggest(name);
                                         return builder.buildFuture();
                                     })
-                                    .executes(context -> {
-                                        ServerPlayer target = EntityArgument.getPlayer(context, "player");
-                                        String pictureName = StringArgumentType.getString(context, "picture");
-                                        if (!isPictureFile(picturesDirectory.resolve(pictureName).normalize())) {
-                                            context.getSource().sendFailure(Component.literal("Picture not found."));
-                                            return 0;
-                                        }
-                                        ItemStack item = paintingItems.create(
-                                                new PaintingSpec(pictureName, PaintingSize.DEFAULT),
-                                                context.getSource().getServer().registryAccess());
-                                        if (!target.getInventory().add(item)) {
-                                            target.drop(item, false);
-                                            context.getSource().sendFailure(Component.literal(
-                                                    "Target inventory is full; Painting was dropped nearby."));
-                                        } else {
-                                            context.getSource().sendSuccess(() -> Component.literal(
-                                                    "Gave WallCanvas Painting '" + pictureName + "' to "
-                                                            + target.getName().getString() + "."), true);
-                                        }
-                                        return 1;
-                                    })));
+                                    .executes(context -> givePainting(context))));
 
             dispatcher.register(wallCanvas);
         });
+    }
+
+    private int givePainting(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> context) {
+        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+        String pictureName = StringArgumentType.getString(context, "picture");
+        if (!isPictureFile(picturesDirectory.resolve(pictureName).normalize())) {
+            context.getSource().sendFailure(Component.literal("Picture not found."));
+            return 0;
+        }
+        ItemStack item = paintingItems.create(
+                new PaintingSpec(pictureName, PaintingSize.DEFAULT),
+                context.getSource().getServer().registryAccess());
+        if (!target.getInventory().add(item)) {
+            target.drop(item, false);
+            context.getSource().sendFailure(Component.literal(
+                    "Target inventory is full; Painting was dropped nearby."));
+        } else {
+            context.getSource().sendSuccess(() -> Component.literal(
+                    "Gave WallCanvas Painting '" + pictureName + "' to "
+                            + target.getName().getString() + "."), true);
+        }
+        return 1;
     }
 
     private int listPictures(MinecraftServer server) {
