@@ -1,6 +1,5 @@
 package com.ultraop.wallcanvas.core.painting;
 
-import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 
 import java.io.IOException;
@@ -29,7 +28,20 @@ public final class PaintingPackBuilder {
         return List.copyOf(generated);
     }
 
+    public static List<PaintingVariantDefinition> rebuildAll(Path picturesDirectory, Path packRoot,
+                                                               Path dataPackRoot) throws IOException {
+        List<PaintingVariantDefinition> all = new ArrayList<>();
+        all.addAll(rebuild(picturesDirectory, packRoot, PaintingSize.DEFAULT));
+        all.addAll(rebuild(picturesDirectory, packRoot, PaintingSize.LARGE));
+        PaintingDataPackGenerator.generate(dataPackRoot, all);
+        return List.copyOf(all);
+    }
+
     public static Path defaultPackRoot(Path serverRoot) {
         return serverRoot.resolve("wallcanvas").resolve("resourcepack");
+    }
+
+    public static Path defaultDataPackRoot(Path worldRoot) {
+        return worldRoot.resolve("datapacks").resolve("wallcanvas");
     }
 }
