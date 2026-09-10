@@ -7,7 +7,7 @@ description: Server-side custom wall art and map displays.
 commands:
   wallcanvas:
     description: WallCanvas picture library and display commands.
-    usage: /wallcanvas <list|info|give> [player] [picture]
+    usage: /wallcanvas <list|info|create|give> [player] [picture]
     permission: wallcanvas.use
 permissions:
   wallcanvas.use:
