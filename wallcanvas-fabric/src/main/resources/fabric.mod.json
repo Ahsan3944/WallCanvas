@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "wallcanvas",
+  "version": "${version}",
+  "name": "WallCanvas",
+  "description": "Server-side custom wall art and map displays.",
+  "authors": ["UltraOP"],
+  "environment": "*",
+  "entrypoints": {
+    "server": [
+      "com.ultraop.wallcanvas.fabric.WallCanvasFabric"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.18.1",
+    "minecraft": "1.21.11",
+    "fabric-api": "*"
+  }
+}
