@@ -1,0 +1,39 @@
+plugins {
+    id 'net.fabricmc.fabric-loom-remap' version project.fabric_loom_version
+}
+
+base {
+    archivesName = 'wallcanvas-fabric'
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    implementation project(path: ':wallcanvas-core')
+}
+
+loom {
+    mods {
+        'wallcanvas' {
+            sourceSet sourceSets.main
+        }
+    }
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version
+    }
+}
+
+jar {
+    from(project(':wallcanvas-core').sourceSets.main.output)
+}
+
+remapJar {
+    archiveClassifier = ''
+}
