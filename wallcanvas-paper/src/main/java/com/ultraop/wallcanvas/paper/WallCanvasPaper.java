@@ -13,7 +13,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
-import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -23,36 +22,47 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Properties;
 
-public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor, TabCompleter, Listener {
+public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor, org.bukkit.command.TabCompleter, Listener {
     private Path picturesDirectory;
     private PaperPaintingItems paintingItems;
     private DisplayStore displayStore;
-    private String resourcePackUrl;
-    private byte[] resourcePackHash;
+    private String resourcePackUrl = "";
+    private byte[] resourcePackHash = new byte[0];
 
     @Override
-    public void onEnable() {
+    public void onLoad() {
         picturesDirectory = getDataFolder().toPath().resolve("pictures");
         try {
             Files.createDirectories(picturesDirectory);
+            saveDefaultConfig();
             Path packRoot = PaintingPackBuilder.defaultPackRoot(getDataFolder().toPath());
-            Path worldRoot = getServer().getWorlds().get(0).getWorldFolder().toPath();
+            Path worldRoot = resolveDefaultWorldRoot();
             PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot,
                     PaintingPackBuilder.defaultDataPackRoot(worldRoot));
             Path archive = PaintingResourcePackArchive.zip(packRoot);
             String sha1 = PaintingResourcePackArchive.sha1Hex(archive);
             resourcePackHash = java.util.HexFormat.of().parseHex(sha1);
-            saveDefaultConfig();
             resourcePackUrl = getConfig().getString("resource-pack.url", "").trim();
-            getLogger().info("Generated WallCanvas resource pack: " + archive + " (SHA-1 " + sha1 + ")");
+            getLogger().info("Generated WallCanvas resource/data packs before world loading: " + archive
+                    + " (SHA-1 " + sha1 + ")");
             if (resourcePackUrl.isBlank()) {
                 getLogger().warning("resource-pack.url is not configured; players will not receive the generated pack automatically.");
             }
         } catch (IOException exception) {
             getLogger().severe("Unable to initialize WallCanvas Painting resources: " + exception.getMessage());
+        }
+    }
+
+    @Override
+    public void onEnable() {
+        if (picturesDirectory == null) {
+            getLogger().severe("WallCanvas resources were not initialized during onLoad; disabling plugin.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -147,9 +157,24 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
     }
 
     private static List<String> filter(List<String> values, String prefix) {
-        String lower = prefix.toLowerCase(java.util.Locale.ROOT);
+        String lower = prefix.toLowerCase(Locale.ROOT);
         List<String> result = new ArrayList<>();
-        for (String value : values) if (value.toLowerCase(java.util.Locale.ROOT).startsWith(lower)) result.add(value);
+        for (String value : values) if (value.toLowerCase(Locale.ROOT).startsWith(lower)) result.add(value);
         return result;
+    }
+
+    private Path resolveDefaultWorldRoot() throws IOException {
+        Path container = getServer().getWorldContainer().toPath();
+        Path propertiesFile = container.resolve("server.properties");
+        String levelName = "world";
+        if (Files.isRegularFile(propertiesFile)) {
+            Properties properties = new Properties();
+            try (var input = Files.newInputStream(propertiesFile)) {
+                properties.load(input);
+            }
+            String configured = properties.getProperty("level-name", "world").trim();
+            if (!configured.isBlank()) levelName = configured;
+        }
+        return container.resolve(Paths.get(levelName)).normalize();
     }
 }
