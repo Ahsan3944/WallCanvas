@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /** Shared persistent store used by both Paper and Fabric integrations. */
@@ -24,6 +25,10 @@ public final class DisplayStore {
 
     public List<DisplayDefinition> all() {
         return List.copyOf(displays);
+    }
+
+    public Optional<DisplayDefinition> find(UUID id) {
+        return displays.stream().filter(display -> display.id().equals(id)).findFirst();
     }
 
     public void add(DisplayDefinition definition) throws IOException {
