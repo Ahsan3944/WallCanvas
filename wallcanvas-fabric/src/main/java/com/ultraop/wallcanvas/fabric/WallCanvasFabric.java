@@ -63,7 +63,9 @@ public final class WallCanvasFabric implements ModInitializer {
                                                         context.getSource().sendFailure(Component.literal("Picture not found."));
                                                         return 0;
                                                     }
-                                                    ItemStack item = paintingItems.create(new PaintingSpec(pictureName, PaintingSize.DEFAULT));
+                                                    ItemStack item = paintingItems.create(
+                                                            new PaintingSpec(pictureName, PaintingSize.DEFAULT),
+                                                            context.getSource().getServer().registryAccess());
                                                     if (!target.getInventory().add(item)) {
                                                         target.drop(item, false);
                                                         context.getSource().sendFailure(Component.literal("Target inventory is full; Painting was dropped nearby."));
@@ -94,13 +96,15 @@ public final class WallCanvasFabric implements ModInitializer {
         displayStore = new DisplayStore(server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT)
                 .resolve("wallcanvas")
                 .resolve("displays.json"));
-        Path packRoot = PaintingPackBuilder.defaultPackRoot(server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT));
+        Path worldRoot = server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT);
+        Path packRoot = PaintingPackBuilder.defaultPackRoot(worldRoot);
+        Path dataPackRoot = PaintingPackBuilder.defaultDataPackRoot(worldRoot);
         try {
             Files.createDirectories(picturesDirectory);
             displayStore.load();
-            var defaults = PaintingPackBuilder.rebuild(picturesDirectory, packRoot, PaintingSize.DEFAULT);
-            PaintingPackBuilder.rebuild(picturesDirectory, packRoot, PaintingSize.LARGE);
-            System.out.println("[WallCanvas] Generated " + defaults.size() + " Painting variant(s) at " + packRoot);
+            var variants = PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot, dataPackRoot);
+            System.out.println("[WallCanvas] Generated " + variants.size()
+                    + " Painting variant(s) at " + packRoot + " and " + dataPackRoot);
         } catch (IOException exception) {
             throw new RuntimeException("Unable to initialize WallCanvas storage/resources", exception);
         }
