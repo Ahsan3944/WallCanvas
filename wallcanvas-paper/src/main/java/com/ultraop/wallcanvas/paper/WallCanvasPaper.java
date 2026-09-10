@@ -2,10 +2,15 @@ package com.ultraop.wallcanvas.paper;
 
 import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
+import com.ultraop.wallcanvas.core.painting.PaintingSize;
+import com.ultraop.wallcanvas.core.painting.PaintingSpec;
+import com.ultraop.wallcanvas.paper.painting.PaperPaintingItems;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
@@ -16,6 +21,7 @@ import java.util.List;
 
 public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor, TabCompleter {
     private Path picturesDirectory;
+    private PaperPaintingItems paintingItems;
 
     @Override
     public void onEnable() {
@@ -27,6 +33,8 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+
+        paintingItems = new PaperPaintingItems(this);
 
         var command = getCommand("wallcanvas");
         if (command == null) {
@@ -63,23 +71,45 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             return true;
         }
 
-        sender.sendMessage("Usage: /wallcanvas list | /wallcanvas info <picture>");
+        if (args[0].equalsIgnoreCase("give") && args.length >= 3) {
+            Player target = Bukkit.getPlayerExact(args[1]);
+            if (target == null) {
+                sender.sendMessage("Player not found or offline.");
+                return true;
+            }
+            String pictureName = args[2];
+            if (!isPictureFile(picturesDirectory.resolve(pictureName).normalize())) {
+                sender.sendMessage("Picture not found.");
+                return true;
+            }
+            PaintingSpec spec = new PaintingSpec(pictureName, PaintingSize.DEFAULT);
+            target.getInventory().addItem(paintingItems.create(spec));
+            sender.sendMessage("Gave WallCanvas Painting '" + pictureName + "' to " + target.getName() + ".");
+            return true;
+        }
+
+        sender.sendMessage("Usage: /wallcanvas list | /wallcanvas info <picture> | /wallcanvas give <player> <picture>");
         return true;
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return filter(List.of("list", "info"), args[0]);
-        if (args.length == 2 && args[0].equalsIgnoreCase("info")) {
-            try {
-                List<String> names = ImageLibrary.scan(picturesDirectory).stream()
-                        .map(path -> path.getFileName().toString()).toList();
-                return filter(names, args[1]);
-            } catch (IOException ignored) {
-                return List.of();
-            }
+        if (args.length == 1) return filter(List.of("list", "info", "give"), args[0]);
+        if (args.length == 2 && args[0].equalsIgnoreCase("info")) return pictureNames(args[1]);
+        if (args.length == 2 && args[0].equalsIgnoreCase("give")) {
+            return filter(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList(), args[1]);
         }
+        if (args.length == 3 && args[0].equalsIgnoreCase("give")) return pictureNames(args[2]);
         return List.of();
+    }
+
+    private List<String> pictureNames(String prefix) {
+        try {
+            return filter(ImageLibrary.scan(picturesDirectory).stream()
+                    .map(path -> path.getFileName().toString()).toList(), prefix);
+        } catch (IOException ignored) {
+            return List.of();
+        }
     }
 
     private boolean isPictureFile(Path path) {
