@@ -4,7 +4,6 @@ import com.ultraop.wallcanvas.core.painting.PaintingMetadata;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import com.ultraop.wallcanvas.core.painting.PaintingVariantFactory;
 import net.minecraft.core.Holder;
-import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -29,8 +28,7 @@ public final class FabricPaintingItems {
         String variantId = PaintingVariantFactory.create(spec).variantId();
         ResourceLocation id = ResourceLocation.parse(variantId);
         ResourceKey<PaintingVariant> key = ResourceKey.create(Registries.PAINTING_VARIANT, id);
-        Registry<PaintingVariant> registry = registryAccess.lookupOrThrow(Registries.PAINTING_VARIANT);
-        Holder<PaintingVariant> variant = registry.getOrThrow(key);
+        Holder<PaintingVariant> variant = registryAccess.lookupOrThrow(Registries.PAINTING_VARIANT).getOrThrow(key);
         item.set(DataComponents.PAINTING_VARIANT, variant);
         return item;
     }
