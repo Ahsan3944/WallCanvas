@@ -17,6 +17,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.LevelResource;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -104,14 +105,10 @@ public final class WallCanvasFabric implements ModInitializer {
     }
 
     private void onServerStarted(MinecraftServer server) {
-        picturesDirectory = server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT)
-                .resolve("wallcanvas")
-                .resolve("pictures");
+        Path worldRoot = server.getWorldPath(LevelResource.ROOT);
+        picturesDirectory = worldRoot.resolve("wallcanvas").resolve("pictures");
         paintingItems = new FabricPaintingItems();
-        displayStore = new DisplayStore(server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT)
-                .resolve("wallcanvas")
-                .resolve("displays.json"));
-        Path worldRoot = server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT);
+        displayStore = new DisplayStore(worldRoot.resolve("wallcanvas").resolve("displays.json"));
         Path packRoot = PaintingPackBuilder.defaultPackRoot(worldRoot);
         Path dataPackRoot = PaintingPackBuilder.defaultDataPackRoot(worldRoot);
         try {
