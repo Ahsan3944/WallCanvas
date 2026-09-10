@@ -1,11 +1,13 @@
 package com.ultraop.wallcanvas.fabric;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.painting.PaintingSize;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import com.ultraop.wallcanvas.fabric.painting.FabricPaintingItems;
+import com.ultraop.wallcanvas.fabric.painting.FabricPaintingPlacement;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -15,12 +17,14 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public final class WallCanvasFabric implements ModInitializer {
     private static Path picturesDirectory;
     private static FabricPaintingItems paintingItems;
+    private static DisplayStore displayStore;
 
     @Override
     public void onInitialize() {
@@ -86,13 +90,20 @@ public final class WallCanvasFabric implements ModInitializer {
                 .resolve("wallcanvas")
                 .resolve("pictures");
         paintingItems = new FabricPaintingItems();
+        displayStore = new DisplayStore(server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT)
+                .resolve("wallcanvas")
+                .resolve("displays.json"));
         try {
             Files.createDirectories(picturesDirectory);
-        } catch (java.io.IOException exception) {
-            throw new RuntimeException("Unable to create WallCanvas pictures directory", exception);
+            displayStore.load();
+        } catch (IOException exception) {
+            throw new RuntimeException("Unable to initialize WallCanvas storage", exception);
         }
+        new FabricPaintingPlacement(displayStore).register();
+
         System.out.println("[WallCanvas] " + WallCanvasCore.NAME + " "
                 + WallCanvasCore.MINECRAFT_VERSION + " initialized. Picture library: " + picturesDirectory);
+        System.out.println("[WallCanvas] Loaded " + displayStore.all().size() + " persistent display(s).");
     }
 
     private static Iterable<String> pictureNames() {
