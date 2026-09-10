@@ -2,6 +2,8 @@ package com.ultraop.wallcanvas.core;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.ultraop.wallcanvas.core.model.DisplayDefinition;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -10,14 +12,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/** Shared persistent store used by both Paper and Fabric integrations. */
 public final class DisplayStore {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private final Path file;
     private final List<DisplayDefinition> displays = new ArrayList<>();
 
-    public DisplayStore(Path file) { this.file = file; }
+    public DisplayStore(Path file) {
+        this.file = file;
+    }
 
-    public List<DisplayDefinition> all() { return List.copyOf(displays); }
+    public List<DisplayDefinition> all() {
+        return List.copyOf(displays);
+    }
 
     public void add(DisplayDefinition definition) throws IOException {
         displays.add(definition);
@@ -39,7 +46,8 @@ public final class DisplayStore {
     }
 
     public void save() throws IOException {
-        Files.createDirectories(file.getParent());
+        Path parent = file.toAbsolutePath().getParent();
+        if (parent != null) Files.createDirectories(parent);
         Files.writeString(file, GSON.toJson(displays), StandardCharsets.UTF_8);
     }
 }
