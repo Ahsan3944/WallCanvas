@@ -9,8 +9,6 @@ import java.util.List;
 
 /** Generates the server-side data pack that registers WallCanvas Painting variants. */
 public final class PaintingDataPackGenerator {
-    public static final int DATA_PACK_FORMAT = 94;
-
     private PaintingDataPackGenerator() {
     }
 
@@ -58,10 +56,14 @@ public final class PaintingDataPackGenerator {
     private static void writePackMetadata(Path root) throws IOException {
         Path file = root.resolve("pack.mcmeta");
         Files.createDirectories(file.getParent());
-        Files.writeString(file,
-                "{\n  \"pack\": {\n    \"pack_format\": " + DATA_PACK_FORMAT
-                        + ",\n    \"description\": \"WallCanvas Painting variants\"\n  }\n}\n",
-                StandardCharsets.UTF_8);
+        String json = "{\n"
+                + "  \"pack\": {\n"
+                + "    \"min_format\": [94, 1],\n"
+                + "    \"max_format\": [94, 1],\n"
+                + "    \"description\": \"WallCanvas Painting variants\"\n"
+                + "  }\n"
+                + "}\n";
+        Files.writeString(file, json, StandardCharsets.UTF_8);
     }
 
     private static String fileName(String variantId) {
