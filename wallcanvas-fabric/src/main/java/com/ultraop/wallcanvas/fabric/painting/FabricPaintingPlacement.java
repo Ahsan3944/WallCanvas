@@ -105,9 +105,10 @@ public final class FabricPaintingPlacement {
                 if (found == null) continue;
 
                 try {
+                    var variant = found.getVariant().value();
                     displayStore.add(DisplayDefinition.painting(
                             found.getUUID(), request.assetId(),
-                            Math.max(1, found.getWidth()), Math.max(1, found.getHeight())));
+                            Math.max(1, variant.width()), Math.max(1, variant.height())));
                 } catch (IOException exception) {
                     found.discard();
                 }
