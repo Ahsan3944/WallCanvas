@@ -86,8 +86,8 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         if (resourcePackUrl.isBlank()) return;
-        event.getPlayer().setResourcePack(resourcePackUrl, resourcePackHash, true,
-                "WallCanvas custom Painting artwork");
+        event.getPlayer().setResourcePack(resourcePackUrl, resourcePackHash,
+                "WallCanvas custom Painting artwork", true);
     }
 
     @Override
