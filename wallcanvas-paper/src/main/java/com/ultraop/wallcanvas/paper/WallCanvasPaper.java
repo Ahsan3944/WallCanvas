@@ -2,6 +2,7 @@ package com.ultraop.wallcanvas.paper;
 
 import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
+import com.ultraop.wallcanvas.core.library.ImageImporter;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.painting.PaintingPackBuilder;
 import com.ultraop.wallcanvas.core.painting.PaintingResourcePackArchive;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 
 public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor, org.bukkit.command.TabCompleter, Listener {
     private Path picturesDirectory;
@@ -41,19 +43,7 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
         try {
             Files.createDirectories(picturesDirectory);
             saveDefaultConfig();
-            Path packRoot = PaintingPackBuilder.defaultPackRoot(getDataFolder().toPath());
-            Path worldRoot = resolveDefaultWorldRoot();
-            PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot,
-                    PaintingPackBuilder.defaultDataPackRoot(worldRoot));
-            Path archive = PaintingResourcePackArchive.zip(packRoot);
-            String sha1 = PaintingResourcePackArchive.sha1Hex(archive);
-            resourcePackHash = java.util.HexFormat.of().parseHex(sha1);
-            resourcePackUrl = getConfig().getString("resource-pack.url", "").trim();
-            getLogger().info("Generated WallCanvas resource/data packs before world loading: " + archive
-                    + " (SHA-1 " + sha1 + ")");
-            if (resourcePackUrl.isBlank()) {
-                getLogger().warning("resource-pack.url is not configured; players will not receive the generated pack automatically.");
-            }
+            rebuildGeneratedPacks();
         } catch (IOException exception) {
             getLogger().severe("Unable to initialize WallCanvas Painting resources: " + exception.getMessage());
         }
@@ -118,6 +108,24 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             sender.sendMessage("Picture: " + picture.getFileName());
             return true;
         }
+        if (args[0].equalsIgnoreCase("create") && args.length >= 4 && args[1].equalsIgnoreCase("web")) {
+            String name = args[2];
+            String url = args[3];
+            sender.sendMessage("Downloading WallCanvas picture '" + name + "'...");
+            CompletableFuture.runAsync(() -> {
+                try {
+                    Path imported = ImageImporter.importUrl(url, picturesDirectory, name);
+                    rebuildGeneratedPacks();
+                    Bukkit.getScheduler().runTask(this, () -> sender.sendMessage(
+                            "Imported '" + imported.getFileName()
+                                    + "'. Restart the server to register the new Painting variant."));
+                } catch (Exception exception) {
+                    Bukkit.getScheduler().runTask(this, () -> sender.sendMessage(
+                            "Web import failed: " + safeMessage(exception)));
+                }
+            });
+            return true;
+        }
         if (args[0].equalsIgnoreCase("give") && args.length >= 3) {
             Player target = Bukkit.getPlayerExact(args[1]);
             if (target == null) { sender.sendMessage("Player not found or offline."); return true; }
@@ -133,14 +141,15 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             }
             return true;
         }
-        sender.sendMessage("Usage: /wallcanvas list | /wallcanvas info <picture> | /wallcanvas give <player> <picture>");
+        sender.sendMessage("Usage: /wallcanvas list | /wallcanvas info <picture> | /wallcanvas create web <name> <url> | /wallcanvas give <player> <picture>");
         return true;
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return filter(List.of("list", "info", "give"), args[0]);
+        if (args.length == 1) return filter(List.of("list", "info", "create", "give"), args[0]);
         if (args.length == 2 && args[0].equalsIgnoreCase("info")) return pictureNames(args[1]);
+        if (args.length == 2 && args[0].equalsIgnoreCase("create")) return filter(List.of("web"), args[1]);
         if (args.length == 2 && args[0].equalsIgnoreCase("give")) return filter(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList(), args[1]);
         if (args.length == 3 && args[0].equalsIgnoreCase("give")) return pictureNames(args[2]);
         return List.of();
@@ -161,6 +170,26 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
         List<String> result = new ArrayList<>();
         for (String value : values) if (value.toLowerCase(Locale.ROOT).startsWith(lower)) result.add(value);
         return result;
+    }
+
+    private void rebuildGeneratedPacks() throws IOException {
+        Path packRoot = PaintingPackBuilder.defaultPackRoot(getDataFolder().toPath());
+        Path worldRoot = resolveDefaultWorldRoot();
+        PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot,
+                PaintingPackBuilder.defaultDataPackRoot(worldRoot));
+        Path archive = PaintingResourcePackArchive.zip(packRoot);
+        String sha1 = PaintingResourcePackArchive.sha1Hex(archive);
+        resourcePackHash = java.util.HexFormat.of().parseHex(sha1);
+        resourcePackUrl = getConfig().getString("resource-pack.url", "").trim();
+        getLogger().info("Generated WallCanvas resource/data packs: " + archive + " (SHA-1 " + sha1 + ")");
+        if (resourcePackUrl.isBlank()) {
+            getLogger().warning("resource-pack.url is not configured; players will not receive the generated pack automatically.");
+        }
+    }
+
+    private static String safeMessage(Exception exception) {
+        String message = exception.getMessage();
+        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
 
     private Path resolveDefaultWorldRoot() throws IOException {
