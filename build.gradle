@@ -3,7 +3,7 @@ plugins {
 }
 
 group = project.maven_group
-gversion = project.mod_version
+version = project.mod_version
 
 subprojects {
     apply plugin: 'java-library'
