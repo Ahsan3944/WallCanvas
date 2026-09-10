@@ -5,6 +5,7 @@ import com.ultraop.wallcanvas.core.model.DisplayDefinition;
 import com.ultraop.wallcanvas.core.painting.PaintingMetadata;
 import com.ultraop.wallcanvas.core.painting.PaintingSize;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
+import org.bukkit.GameMode;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Painting;
 import org.bukkit.entity.Player;
@@ -53,7 +54,7 @@ public final class PaperPaintingListener implements Listener {
         try {
             displayStore.add(DisplayDefinition.painting(
                     painting.getUniqueId(), assetId,
-                    Math.max(1, painting.getWidth()), Math.max(1, painting.getHeight())));
+                    Math.max(1, (int) painting.getWidth()), Math.max(1, (int) painting.getHeight())));
         } catch (IOException exception) {
             event.setCancelled(true);
             plugin.getLogger().warning("Unable to persist WallCanvas Painting "
@@ -69,7 +70,7 @@ public final class PaperPaintingListener implements Listener {
 
         if (event instanceof HangingBreakByEntityEvent byEntity
                 && byEntity.getRemover() instanceof Player player
-                && player.getGameMode().isCreative()) {
+                && player.getGameMode() == GameMode.CREATIVE) {
             removeFromStore(painting);
             painting.remove();
             return;
