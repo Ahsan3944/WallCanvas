@@ -14,6 +14,7 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -84,18 +85,17 @@ public final class WallCanvasFabric implements ModInitializer {
                                                     }
                                                 });
                                                 return 1;
-                                            })))));
+                                            }))));
 
             wallCanvas.then(Commands.literal("give")
-                    .then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player())
+                    .then(Commands.argument("player", EntityArgument.player())
                             .then(Commands.argument("picture", StringArgumentType.word())
                                     .suggests((context, builder) -> {
                                         for (String name : pictureNames()) builder.suggest(name);
                                         return builder.buildFuture();
                                     })
                                     .executes(context -> {
-                                        ServerPlayer target = net.minecraft.commands.EntityArgument.getPlayer(
-                                                context, "player");
+                                        ServerPlayer target = EntityArgument.getPlayer(context, "player");
                                         String pictureName = StringArgumentType.getString(context, "picture");
                                         if (!isPictureFile(picturesDirectory.resolve(pictureName).normalize())) {
                                             context.getSource().sendFailure(Component.literal("Picture not found."));
