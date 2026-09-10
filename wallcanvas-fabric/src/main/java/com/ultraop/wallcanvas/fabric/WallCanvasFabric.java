@@ -10,47 +10,62 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 public final class WallCanvasFabric implements ModInitializer {
-    private static Path imageDirectory;
+    private static Path picturesDirectory;
 
     @Override
     public void onInitialize() {
         ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 dispatcher.register(Commands.literal("wallcanvas")
-                        .then(Commands.literal("list").executes(context -> listImages(context.getSource().getServer())))
+                        .then(Commands.literal("list").executes(context -> listPictures(context.getSource().getServer())))
                         .then(Commands.literal("info")
                                 .then(Commands.argument("name", StringArgumentType.word())
                                         .executes(context -> {
-                                            Path image = imageDirectory.resolve(StringArgumentType.getString(context, "name")).normalize();
-                                            if (!image.getParent().equals(imageDirectory) || !java.nio.file.Files.isRegularFile(image)) {
-                                                context.getSource().sendFailure(Component.literal("Image not found."));
+                                            Path picture = picturesDirectory.resolve(StringArgumentType.getString(context, "name")).normalize();
+                                            if (!isPictureFile(picture)) {
+                                                context.getSource().sendFailure(Component.literal("Picture not found."));
                                                 return 0;
                                             }
-                                            context.getSource().sendSuccess(() -> Component.literal("Image: " + image.getFileName()), false);
+                                            context.getSource().sendSuccess(() -> Component.literal("Picture: " + picture.getFileName()), false);
                                             return 1;
                                         }))));
     }
 
-    private int listImages(MinecraftServer server) {
+    private int listPictures(MinecraftServer server) {
         try {
-            var images = ImageLibrary.scan(imageDirectory);
-            server.getPlayerList().broadcastSystemMessage(Component.literal("WallCanvas images (" + images.size() + ")"), false);
-            return images.size();
-        } catch (Exception e) {
+            var pictures = ImageLibrary.scan(picturesDirectory);
+            server.getPlayerList().broadcastSystemMessage(
+                    Component.literal("WallCanvas pictures (" + pictures.size() + ")"), false);
+            return pictures.size();
+        } catch (Exception ignored) {
             return 0;
         }
     }
 
     private void onServerStarted(MinecraftServer server) {
-        imageDirectory = server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT).resolve("wallcanvas").resolve("images");
+        picturesDirectory = server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT)
+                .resolve("wallcanvas")
+                .resolve("pictures");
         try {
-            java.nio.file.Files.createDirectories(imageDirectory);
+            Files.createDirectories(picturesDirectory);
         } catch (java.io.IOException exception) {
-            throw new RuntimeException("Unable to create WallCanvas image directory", exception);
+            throw new RuntimeException("Unable to create WallCanvas pictures directory", exception);
         }
-        System.out.println("[WallCanvas] " + WallCanvasCore.NAME + " " + WallCanvasCore.MINECRAFT_VERSION + " initialized. Image library: " + imageDirectory);
+        System.out.println("[WallCanvas] " + WallCanvasCore.NAME + " "
+                + WallCanvasCore.MINECRAFT_VERSION + " initialized. Picture library: " + picturesDirectory);
+    }
+
+    private static boolean isPictureFile(Path path) {
+        try {
+            return path.getParent().equals(picturesDirectory.toAbsolutePath().normalize())
+                    && Files.isRegularFile(path)
+                    && WallCanvasCore.isSupportedImageExtension(ImageLibrary.extension(path));
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 }
