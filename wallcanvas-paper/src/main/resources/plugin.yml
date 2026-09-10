@@ -4,3 +4,12 @@ main: com.ultraop.wallcanvas.paper.WallCanvasPaper
 api-version: '1.21.11'
 authors: [UltraOP]
 description: Server-side custom wall art and map displays.
+commands:
+  wallcanvas:
+    description: WallCanvas picture library and display commands.
+    usage: /wallcanvas <list|info> [picture]
+    permission: wallcanvas.use
+permissions:
+  wallcanvas.use:
+    description: Use WallCanvas commands.
+    default: op
