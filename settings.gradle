@@ -7,7 +7,9 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    // Fabric Loom adds repositories at project level for its generated mappings.
+    // Allow those repositories to participate in dependency resolution.
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         mavenCentral()
         maven { url = 'https://maven.fabricmc.net/' }
