@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
+import com.ultraop.wallcanvas.core.painting.PaintingPackBuilder;
 import com.ultraop.wallcanvas.core.painting.PaintingSize;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import com.ultraop.wallcanvas.fabric.painting.FabricPaintingItems;
@@ -93,11 +94,15 @@ public final class WallCanvasFabric implements ModInitializer {
         displayStore = new DisplayStore(server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT)
                 .resolve("wallcanvas")
                 .resolve("displays.json"));
+        Path packRoot = PaintingPackBuilder.defaultPackRoot(server.getSavePath(net.minecraft.world.level.storage.LevelResource.ROOT));
         try {
             Files.createDirectories(picturesDirectory);
             displayStore.load();
+            var defaults = PaintingPackBuilder.rebuild(picturesDirectory, packRoot, PaintingSize.DEFAULT);
+            PaintingPackBuilder.rebuild(picturesDirectory, packRoot, PaintingSize.LARGE);
+            System.out.println("[WallCanvas] Generated " + defaults.size() + " Painting variant(s) at " + packRoot);
         } catch (IOException exception) {
-            throw new RuntimeException("Unable to initialize WallCanvas storage", exception);
+            throw new RuntimeException("Unable to initialize WallCanvas storage/resources", exception);
         }
         new FabricPaintingPlacement(displayStore).register();
 
