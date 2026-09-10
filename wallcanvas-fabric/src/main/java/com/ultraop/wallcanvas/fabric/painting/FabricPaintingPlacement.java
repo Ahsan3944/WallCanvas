@@ -6,11 +6,13 @@ import com.ultraop.wallcanvas.core.painting.PaintingMetadata;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.decoration.Painting;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.InteractionResult;
+import net.minecraft.world.phys.AABB;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -45,10 +47,9 @@ public final class FabricPaintingPlacement {
                 existing.add(painting.getUUID());
             }
 
-            String asset = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA)
-                    .copyTag().getString(PaintingMetadata.ASSET).orElse("");
-            String size = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA)
-                    .copyTag().getString(PaintingMetadata.SIZE).orElse("");
+            var tag = stack.get(DataComponents.CUSTOM_DATA).copyTag();
+            String asset = tag.getString(PaintingMetadata.ASSET).orElse("");
+            String size = tag.getString(PaintingMetadata.SIZE).orElse("");
             if (asset.isBlank() || size.isBlank()) return InteractionResult.PASS;
 
             pending.put(serverPlayer.getUUID(), new PendingPlacement(
@@ -63,20 +64,16 @@ public final class FabricPaintingPlacement {
                     pending.remove(request.playerId());
                     continue;
                 }
+
                 Painting found = null;
                 for (Painting painting : request.level().getEntitiesOfClass(Painting.class,
-                        new net.minecraft.world.phys.AABB(request.blockPos()).inflate(5.0))) {
+                        new AABB(request.blockPos()).inflate(5.0))) {
                     if (!request.existing().contains(painting.getUUID())) {
                         found = painting;
                         break;
                     }
                 }
                 if (found == null) continue;
-
-                var data = found.getPersistentDataContainer();
-                data.putString(PaintingMetadata.TYPE, PaintingMetadata.TYPE_VALUE);
-                data.putString(PaintingMetadata.ASSET, request.assetId());
-                data.putString(PaintingMetadata.SIZE, request.size());
 
                 try {
                     displayStore.add(DisplayDefinition.painting(
@@ -91,8 +88,8 @@ public final class FabricPaintingPlacement {
     }
 
     private static boolean isWallCanvasItem(ItemStack stack) {
-        if (stack.isEmpty() || !stack.has(net.minecraft.core.component.DataComponents.CUSTOM_DATA)) return false;
-        var tag = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA).copyTag();
+        if (stack.isEmpty() || !stack.has(DataComponents.CUSTOM_DATA)) return false;
+        var tag = stack.get(DataComponents.CUSTOM_DATA).copyTag();
         return PaintingMetadata.TYPE_VALUE.equals(tag.getString(PaintingMetadata.TYPE).orElse(""))
                 && !tag.getString(PaintingMetadata.ASSET).orElse("").isBlank()
                 && !tag.getString(PaintingMetadata.SIZE).orElse("").isBlank();
