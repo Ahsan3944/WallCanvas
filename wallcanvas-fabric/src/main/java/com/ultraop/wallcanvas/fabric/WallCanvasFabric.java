@@ -84,7 +84,7 @@ public final class WallCanvasFabric implements ModInitializer {
                                                     }
                                                 });
                                                 return 1;
-                                            }))));
+                                            })))));
 
             wallCanvas.then(Commands.literal("give")
                     .then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player())
@@ -114,7 +114,7 @@ public final class WallCanvasFabric implements ModInitializer {
                                                             + target.getName().getString() + "."), true);
                                         }
                                         return 1;
-                                    })));
+                                    }))));
 
             dispatcher.register(wallCanvas);
         });
