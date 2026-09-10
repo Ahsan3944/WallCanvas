@@ -1,10 +1,12 @@
 package com.ultraop.wallcanvas.paper;
 
+import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.painting.PaintingSize;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import com.ultraop.wallcanvas.paper.painting.PaperPaintingItems;
+import com.ultraop.wallcanvas.paper.painting.PaperPaintingListener;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -22,6 +24,7 @@ import java.util.List;
 public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor, TabCompleter {
     private Path picturesDirectory;
     private PaperPaintingItems paintingItems;
+    private DisplayStore displayStore;
 
     @Override
     public void onEnable() {
@@ -34,7 +37,17 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             return;
         }
 
+        displayStore = new DisplayStore(getDataFolder().toPath().resolve("displays.json"));
+        try {
+            displayStore.load();
+        } catch (IOException exception) {
+            getLogger().severe("Unable to load WallCanvas displays: " + exception.getMessage());
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+
         paintingItems = new PaperPaintingItems(this);
+        getServer().getPluginManager().registerEvents(new PaperPaintingListener(this, displayStore), this);
 
         var command = getCommand("wallcanvas");
         if (command == null) {
@@ -46,6 +59,7 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
         command.setTabCompleter(this);
 
         getLogger().info(WallCanvasCore.NAME + " initialized. Picture library: " + picturesDirectory);
+        getLogger().info("Loaded " + displayStore.all().size() + " persistent display(s).");
     }
 
     @Override
