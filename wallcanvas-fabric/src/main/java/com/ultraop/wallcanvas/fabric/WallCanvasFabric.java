@@ -10,6 +10,7 @@ import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import com.ultraop.wallcanvas.fabric.painting.FabricPaintingItems;
 import com.ultraop.wallcanvas.fabric.painting.FabricPaintingPlacement;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.commands.Commands;
@@ -30,7 +31,7 @@ public final class WallCanvasFabric implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
+        ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             var wallCanvas = Commands.literal("wallcanvas");
 
@@ -40,9 +41,7 @@ public final class WallCanvasFabric implements ModInitializer {
             wallCanvas.then(Commands.literal("info")
                     .then(Commands.argument("name", StringArgumentType.word())
                             .suggests((context, builder) -> {
-                                for (String name : pictureNames()) {
-                                    builder.suggest(name);
-                                }
+                                for (String name : pictureNames()) builder.suggest(name);
                                 return builder.buildFuture();
                             })
                             .executes(context -> {
@@ -61,9 +60,7 @@ public final class WallCanvasFabric implements ModInitializer {
                     .then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player())
                             .then(Commands.argument("picture", StringArgumentType.word())
                                     .suggests((context, builder) -> {
-                                        for (String name : pictureNames()) {
-                                            builder.suggest(name);
-                                        }
+                                        for (String name : pictureNames()) builder.suggest(name);
                                         return builder.buildFuture();
                                     })
                                     .executes(context -> {
@@ -104,7 +101,7 @@ public final class WallCanvasFabric implements ModInitializer {
         }
     }
 
-    private void onServerStarted(MinecraftServer server) {
+    private void onServerStarting(MinecraftServer server) {
         Path worldRoot = server.getWorldPath(LevelResource.ROOT);
         picturesDirectory = worldRoot.resolve("wallcanvas").resolve("pictures");
         paintingItems = new FabricPaintingItems();
@@ -116,7 +113,7 @@ public final class WallCanvasFabric implements ModInitializer {
             displayStore.load();
             var variants = PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot, dataPackRoot);
             System.out.println("[WallCanvas] Generated " + variants.size()
-                    + " Painting variant(s) at " + packRoot + " and " + dataPackRoot);
+                    + " Painting variant(s) before world loading at " + packRoot + " and " + dataPackRoot);
         } catch (IOException exception) {
             throw new RuntimeException("Unable to initialize WallCanvas storage/resources", exception);
         }
