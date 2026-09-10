@@ -3,10 +3,14 @@ package com.ultraop.wallcanvas.paper.painting;
 import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.model.DisplayDefinition;
 import com.ultraop.wallcanvas.core.painting.PaintingMetadata;
+import com.ultraop.wallcanvas.core.painting.PaintingSize;
+import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Painting;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingBreakEvent;
 import org.bukkit.event.hanging.HangingPlaceEvent;
 import org.bukkit.inventory.ItemStack;
@@ -19,6 +23,7 @@ import java.io.IOException;
 public final class PaperPaintingListener implements Listener {
     private final JavaPlugin plugin;
     private final DisplayStore displayStore;
+    private final PaperPaintingItems paintingItems;
     private final NamespacedKey typeKey;
     private final NamespacedKey assetKey;
     private final NamespacedKey sizeKey;
@@ -26,6 +31,7 @@ public final class PaperPaintingListener implements Listener {
     public PaperPaintingListener(JavaPlugin plugin, DisplayStore displayStore) {
         this.plugin = plugin;
         this.displayStore = displayStore;
+        this.paintingItems = new PaperPaintingItems(plugin);
         this.typeKey = new NamespacedKey(plugin, PaintingMetadata.TYPE);
         this.assetKey = new NamespacedKey(plugin, PaintingMetadata.ASSET);
         this.sizeKey = new NamespacedKey(plugin, PaintingMetadata.SIZE);
@@ -58,11 +64,45 @@ public final class PaperPaintingListener implements Listener {
     @EventHandler
     public void onHangingBreak(HangingBreakEvent event) {
         if (!(event.getEntity() instanceof Painting painting) || !isWallCanvasPainting(painting)) return;
+
+        event.setCancelled(true);
+
+        if (event instanceof HangingBreakByEntityEvent byEntity
+                && byEntity.getRemover() instanceof Player player
+                && player.getGameMode().isCreative()) {
+            removeFromStore(painting);
+            return;
+        }
+
+        try {
+            PaintingSize size = sizeFor(painting);
+            ItemStack item = paintingItems.create(new PaintingSpec(
+                    painting.getPersistentDataContainer().get(assetKey, PersistentDataType.STRING), size));
+            painting.getWorld().dropItemNaturally(painting.getLocation(), item);
+            removeFromStore(painting);
+        } catch (Exception exception) {
+            event.setCancelled(false);
+            plugin.getLogger().warning("Unable to create WallCanvas Painting drop for "
+                    + painting.getUniqueId() + ": " + exception.getMessage());
+        }
+    }
+
+    private void removeFromStore(Painting painting) {
         try {
             displayStore.remove(painting.getUniqueId());
         } catch (IOException exception) {
             plugin.getLogger().warning("Unable to remove WallCanvas Painting "
                     + painting.getUniqueId() + " from storage: " + exception.getMessage());
+        }
+    }
+
+    private PaintingSize sizeFor(Painting painting) {
+        String storedSize = painting.getPersistentDataContainer().get(sizeKey, PersistentDataType.STRING);
+        try {
+            return storedSize == null ? PaintingSize.DEFAULT : PaintingSize.valueOf(storedSize);
+        } catch (IllegalArgumentException ignored) {
+            return painting.getWidth() >= PaintingSize.LARGE.widthBlocks()
+                    ? PaintingSize.LARGE : PaintingSize.DEFAULT;
         }
     }
 
