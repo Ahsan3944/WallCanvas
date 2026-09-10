@@ -3,6 +3,7 @@ package com.ultraop.wallcanvas.paper;
 import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
+import com.ultraop.wallcanvas.core.painting.PaintingPackBuilder;
 import com.ultraop.wallcanvas.core.painting.PaintingSize;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import com.ultraop.wallcanvas.paper.painting.PaperPaintingItems;
@@ -40,8 +41,12 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
         displayStore = new DisplayStore(getDataFolder().toPath().resolve("displays.json"));
         try {
             displayStore.load();
+            Path packRoot = PaintingPackBuilder.defaultPackRoot(getDataFolder().toPath());
+            var generated = PaintingPackBuilder.rebuild(picturesDirectory, packRoot, PaintingSize.DEFAULT);
+            PaintingPackBuilder.rebuild(picturesDirectory, packRoot, PaintingSize.LARGE);
+            getLogger().info("Generated " + generated.size() + " WallCanvas Painting variant(s) at " + packRoot);
         } catch (IOException exception) {
-            getLogger().severe("Unable to load WallCanvas displays: " + exception.getMessage());
+            getLogger().severe("Unable to initialize WallCanvas Painting resources: " + exception.getMessage());
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
