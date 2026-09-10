@@ -114,7 +114,7 @@ public final class WallCanvasFabric implements ModInitializer {
                                                             + target.getName().getString() + "."), true);
                                         }
                                         return 1;
-                                    }))));
+                                    })));
 
             dispatcher.register(wallCanvas);
         });
