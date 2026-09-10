@@ -8,4 +8,5 @@ java {
 
 dependencies {
     api 'com.google.code.gson:gson:2.13.1'
+    api 'org.sejda.imageio:webp-imageio:0.1.6'
 }
