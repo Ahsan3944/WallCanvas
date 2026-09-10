@@ -29,10 +29,13 @@ public final class PaintingResourcePackGenerator {
     private static void writeVariant(Path packRoot, PaintingVariantDefinition definition) throws IOException {
         Path file = PaintingResourcePackLayout.variantJson(packRoot, definition.variantId());
         Files.createDirectories(file.getParent());
+        String id = definition.variantId().substring(definition.variantId().indexOf(':') + 1);
         String json = GSON.toJson(new VariantJson(
-                "wallcanvas:" + definition.variantId().substring(definition.variantId().indexOf(':') + 1),
-                definition.width(), definition.height(),
-                "WallCanvas", definition.assetId()));
+                definition.assetId(),
+                definition.width(),
+                definition.height(),
+                "WallCanvas",
+                "painting.wallcanvas." + id));
         Files.writeString(file, json, StandardCharsets.UTF_8);
     }
 
@@ -40,7 +43,7 @@ public final class PaintingResourcePackGenerator {
         Path file = PaintingResourcePackLayout.atlas(packRoot);
         Files.createDirectories(file.getParent());
         String json = GSON.toJson(new AtlasJson(List.of(
-                new AtlasSource("directory", "wallcanvas:painting", null)
+                new AtlasSource("directory", "wallcanvas/painting", "wallcanvas:")
         )));
         Files.writeString(file, json, StandardCharsets.UTF_8);
     }
@@ -49,15 +52,19 @@ public final class PaintingResourcePackGenerator {
         Path file = packRoot.resolve("data").resolve("minecraft").resolve("tags")
                 .resolve("painting_variant").resolve("placeable.json");
         Files.createDirectories(file.getParent());
-        String id = "wallcanvas:" + definition.variantId().substring(definition.variantId().indexOf(':') + 1);
-        String json = GSON.toJson(new PlaceableTag(List.of(id)));
+        String id = definition.variantId().startsWith("wallcanvas:")
+                ? definition.variantId()
+                : "wallcanvas:" + definition.variantId();
+        String json = GSON.toJson(new PlaceableTag(false, List.of(id)));
         Files.writeString(file, json, StandardCharsets.UTF_8);
     }
 
     private static void writePackMetadata(Path packRoot) throws IOException {
         Path file = PaintingResourcePackLayout.packMcmeta(packRoot);
         Files.createDirectories(file.getParent());
-        String json = GSON.toJson(new PackMetadata(new PackInfo(75, "WallCanvas generated Painting pack")));
+        String json = GSON.toJson(new PackMetadata(
+                new PackInfo(PaintingResourcePackLayout.PACK_FORMAT,
+                        "WallCanvas generated Painting pack")));
         Files.writeString(file, json, StandardCharsets.UTF_8);
     }
 
@@ -70,7 +77,7 @@ public final class PaintingResourcePackGenerator {
     private record AtlasSource(String type, String source, String prefix) {
     }
 
-    private record PlaceableTag(List<String> values) {
+    private record PlaceableTag(boolean replace, List<String> values) {
     }
 
     private record PackMetadata(PackInfo pack) {
