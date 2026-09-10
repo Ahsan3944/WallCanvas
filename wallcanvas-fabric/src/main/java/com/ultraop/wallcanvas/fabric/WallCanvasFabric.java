@@ -30,51 +30,66 @@ public final class WallCanvasFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
-                dispatcher.register(Commands.literal("wallcanvas")
-                        .then(Commands.literal("list")
-                                .executes(context -> listPictures(context.getSource().getServer())))
-                        .then(Commands.literal("info")
-                                .then(Commands.argument("name", StringArgumentType.word())
-                                        .suggests((context, builder) -> {
-                                            for (String name : pictureNames()) builder.suggest(name);
-                                            return builder.buildFuture();
-                                        })
-                                        .executes(context -> {
-                                            Path picture = picturesDirectory.resolve(StringArgumentType.getString(context, "name")).normalize();
-                                            if (!isPictureFile(picture)) {
-                                                context.getSource().sendFailure(Component.literal("Picture not found."));
-                                                return 0;
-                                            }
-                                            context.getSource().sendSuccess(() -> Component.literal("Picture: " + picture.getFileName()), false);
-                                            return 1;
-                                        })))
-                        .then(Commands.literal("give")
-                                .then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player())
-                                        .then(Commands.argument("picture", StringArgumentType.word())
-                                                .suggests((context, builder) -> {
-                                                    for (String name : pictureNames()) builder.suggest(name);
-                                                    return builder.buildFuture();
-                                                })
-                                                .executes(context -> {
-                                                    ServerPlayer target = net.minecraft.commands.arguments.EntityArgument.getPlayer(context, "player");
-                                                    String pictureName = StringArgumentType.getString(context, "picture");
-                                                    if (!isPictureFile(picturesDirectory.resolve(pictureName).normalize())) {
-                                                        context.getSource().sendFailure(Component.literal("Picture not found."));
-                                                        return 0;
-                                                    }
-                                                    ItemStack item = paintingItems.create(
-                                                            new PaintingSpec(pictureName, PaintingSize.DEFAULT),
-                                                            context.getSource().getServer().registryAccess());
-                                                    if (!target.getInventory().add(item)) {
-                                                        target.drop(item, false);
-                                                        context.getSource().sendFailure(Component.literal("Target inventory is full; Painting was dropped nearby."));
-                                                    } else {
-                                                        context.getSource().sendSuccess(() -> Component.literal(
-                                                                "Gave WallCanvas Painting '" + pictureName + "' to " + target.getName().getString() + "."), true);
-                                                    }
-                                                    return 1;
-                                                })))));
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            var wallCanvas = Commands.literal("wallcanvas");
+
+            wallCanvas.then(Commands.literal("list")
+                    .executes(context -> listPictures(context.getSource().getServer())));
+
+            wallCanvas.then(Commands.literal("info")
+                    .then(Commands.argument("name", StringArgumentType.word())
+                            .suggests((context, builder) -> {
+                                for (String name : pictureNames()) {
+                                    builder.suggest(name);
+                                }
+                                return builder.buildFuture();
+                            })
+                            .executes(context -> {
+                                Path picture = picturesDirectory.resolve(
+                                        StringArgumentType.getString(context, "name")).normalize();
+                                if (!isPictureFile(picture)) {
+                                    context.getSource().sendFailure(Component.literal("Picture not found."));
+                                    return 0;
+                                }
+                                context.getSource().sendSuccess(
+                                        () -> Component.literal("Picture: " + picture.getFileName()), false);
+                                return 1;
+                            })));
+
+            wallCanvas.then(Commands.literal("give")
+                    .then(Commands.argument("player", net.minecraft.commands.arguments.EntityArgument.player())
+                            .then(Commands.argument("picture", StringArgumentType.word())
+                                    .suggests((context, builder) -> {
+                                        for (String name : pictureNames()) {
+                                            builder.suggest(name);
+                                        }
+                                        return builder.buildFuture();
+                                    })
+                                    .executes(context -> {
+                                        ServerPlayer target = net.minecraft.commands.arguments.EntityArgument.getPlayer(
+                                                context, "player");
+                                        String pictureName = StringArgumentType.getString(context, "picture");
+                                        if (!isPictureFile(picturesDirectory.resolve(pictureName).normalize())) {
+                                            context.getSource().sendFailure(Component.literal("Picture not found."));
+                                            return 0;
+                                        }
+                                        ItemStack item = paintingItems.create(
+                                                new PaintingSpec(pictureName, PaintingSize.DEFAULT),
+                                                context.getSource().getServer().registryAccess());
+                                        if (!target.getInventory().add(item)) {
+                                            target.drop(item, false);
+                                            context.getSource().sendFailure(Component.literal(
+                                                    "Target inventory is full; Painting was dropped nearby."));
+                                        } else {
+                                            context.getSource().sendSuccess(() -> Component.literal(
+                                                    "Gave WallCanvas Painting '" + pictureName + "' to "
+                                                            + target.getName().getString() + "."), true);
+                                        }
+                                        return 1;
+                                    }))));
+
+            dispatcher.register(wallCanvas);
+        });
     }
 
     private int listPictures(MinecraftServer server) {
