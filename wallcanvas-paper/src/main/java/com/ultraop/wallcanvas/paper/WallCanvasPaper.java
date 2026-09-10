@@ -39,8 +39,9 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
         try {
             Files.createDirectories(picturesDirectory);
             Path packRoot = PaintingPackBuilder.defaultPackRoot(getDataFolder().toPath());
-            PaintingPackBuilder.rebuild(picturesDirectory, packRoot, PaintingSize.DEFAULT);
-            PaintingPackBuilder.rebuild(picturesDirectory, packRoot, PaintingSize.LARGE);
+            Path worldRoot = getServer().getWorlds().get(0).getWorldFolder().toPath();
+            PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot,
+                    PaintingPackBuilder.defaultDataPackRoot(worldRoot));
             Path archive = PaintingResourcePackArchive.zip(packRoot);
             String sha1 = PaintingResourcePackArchive.sha1Hex(archive);
             resourcePackHash = java.util.HexFormat.of().parseHex(sha1);
@@ -114,8 +115,12 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             if (!isPictureFile(picturesDirectory.resolve(pictureName).normalize())) {
                 sender.sendMessage("Picture not found."); return true;
             }
-            target.getInventory().addItem(paintingItems.create(new PaintingSpec(pictureName, PaintingSize.DEFAULT)));
-            sender.sendMessage("Gave WallCanvas Painting '" + pictureName + "' to " + target.getName() + ".");
+            try {
+                target.getInventory().addItem(paintingItems.create(new PaintingSpec(pictureName, PaintingSize.DEFAULT)));
+                sender.sendMessage("Gave WallCanvas Painting '" + pictureName + "' to " + target.getName() + ".");
+            } catch (IllegalStateException exception) {
+                sender.sendMessage("Painting variant is not registered yet: " + exception.getMessage());
+            }
             return true;
         }
         sender.sendMessage("Usage: /wallcanvas list | /wallcanvas info <picture> | /wallcanvas give <player> <picture>");
