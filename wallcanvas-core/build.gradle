@@ -1,0 +1,11 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    withSourcesJar()
+}
+
+dependencies {
+    api 'com.google.code.gson:gson:2.13.1'
+}
