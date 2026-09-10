@@ -1,0 +1,6 @@
+name: WallCanvas
+version: '${version}'
+main: com.ultraop.wallcanvas.paper.WallCanvasPaper
+api-version: '1.21.11'
+authors: [UltraOP]
+description: Server-side custom wall art and map displays.
