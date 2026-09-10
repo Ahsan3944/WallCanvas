@@ -1,0 +1,4 @@
+resource-pack:
+  # Public HTTPS URL serving wallcanvas/resourcepack.zip
+  # Leave empty to disable automatic delivery.
+  url: ""
