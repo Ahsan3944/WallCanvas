@@ -10,7 +10,6 @@ import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import com.ultraop.wallcanvas.fabric.painting.FabricPaintingItems;
 import com.ultraop.wallcanvas.fabric.painting.FabricPaintingPlacement;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.commands.Commands;
