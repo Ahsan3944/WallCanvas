@@ -13,6 +13,7 @@ import com.ultraop.wallcanvas.fabric.painting.FabricPaintingPlacement;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
@@ -37,85 +38,88 @@ public final class WallCanvasFabric implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             var wallCanvas = Commands.literal("wallcanvas");
 
-            wallCanvas.then(Commands.literal("list")
-                    .executes(context -> listPictures(context.getSource().getServer())));
+            var list = Commands.literal("list")
+                    .executes(context -> listPictures(context.getSource().getServer()));
+            wallCanvas.then(list);
 
-            wallCanvas.then(Commands.literal("info")
-                    .then(Commands.argument("name", StringArgumentType.word())
-                            .suggests((context, builder) -> {
-                                for (String name : pictureNames()) builder.suggest(name);
-                                return builder.buildFuture();
-                            })
-                            .executes(context -> {
-                                Path picture = picturesDirectory.resolve(
-                                        StringArgumentType.getString(context, "name")).normalize();
-                                if (!isPictureFile(picture)) {
-                                    context.getSource().sendFailure(Component.literal("Picture not found."));
-                                    return 0;
-                                }
-                                context.getSource().sendSuccess(
-                                        () -> Component.literal("Picture: " + picture.getFileName()), false);
-                                return 1;
-                            })));
+            var infoName = Commands.argument("name", StringArgumentType.word())
+                    .suggests((context, builder) -> {
+                        for (String name : pictureNames()) builder.suggest(name);
+                        return builder.buildFuture();
+                    })
+                    .executes(context -> {
+                        Path picture = picturesDirectory.resolve(
+                                StringArgumentType.getString(context, "name")).normalize();
+                        if (!isPictureFile(picture)) {
+                            context.getSource().sendFailure(Component.literal("Picture not found."));
+                            return 0;
+                        }
+                        context.getSource().sendSuccess(
+                                () -> Component.literal("Picture: " + picture.getFileName()), false);
+                        return 1;
+                    });
+            wallCanvas.then(Commands.literal("info").then(infoName));
 
-            wallCanvas.then(Commands.literal("create")
-                    .then(Commands.literal("web")
-                            .then(Commands.argument("name", StringArgumentType.word())
-                                    .then(Commands.argument("url", StringArgumentType.string())
-                                            .executes(context -> {
-                                                MinecraftServer server = context.getSource().getServer();
-                                                String name = StringArgumentType.getString(context, "name");
-                                                String url = StringArgumentType.getString(context, "url");
-                                                context.getSource().sendSuccess(
-                                                        () -> Component.literal("Downloading WallCanvas picture '" + name + "'..."), false);
-                                                CompletableFuture.runAsync(() -> {
-                                                    try {
-                                                        Path imported = ImageImporter.importUrl(url, picturesDirectory, name);
-                                                        Path worldRoot = server.getWorldPath(LevelResource.ROOT);
-                                                        PaintingPackBuilder.rebuildAll(
-                                                                picturesDirectory,
-                                                                PaintingPackBuilder.defaultPackRoot(worldRoot),
-                                                                PaintingPackBuilder.defaultDataPackRoot(worldRoot));
-                                                        server.execute(() -> context.getSource().sendSuccess(
-                                                                () -> Component.literal("Imported '" + imported.getFileName()
-                                                                        + "'. Restart the server to register the new Painting variant."), false));
-                                                    } catch (Exception exception) {
-                                                        server.execute(() -> context.getSource().sendFailure(
-                                                                Component.literal("Web import failed: " + safeMessage(exception))));
-                                                    }
-                                                });
-                                                return 1;
-                                            }))));
+            var webUrl = Commands.argument("url", StringArgumentType.string())
+                    .executes(context -> createWebPicture(context.getSource(),
+                            StringArgumentType.getString(context, "name"),
+                            StringArgumentType.getString(context, "url")));
+            var webName = Commands.argument("name", StringArgumentType.word()).then(webUrl);
+            var web = Commands.literal("web").then(webName);
+            wallCanvas.then(Commands.literal("create").then(web));
 
-            wallCanvas.then(Commands.literal("give")
-                    .then(Commands.argument("player", EntityArgument.player())
-                            .then(Commands.argument("picture", StringArgumentType.word())
-                                    .suggests((context, builder) -> {
-                                        for (String name : pictureNames()) builder.suggest(name);
-                                        return builder.buildFuture();
-                                    })
-                                    .executes(context -> givePainting(context))));
+            var givePicture = Commands.argument("picture", StringArgumentType.word())
+                    .suggests((context, builder) -> {
+                        for (String name : pictureNames()) builder.suggest(name);
+                        return builder.buildFuture();
+                    })
+                    .executes(context -> givePainting(context.getSource(),
+                            EntityArgument.getPlayer(context, "player"),
+                            StringArgumentType.getString(context, "picture")));
+            var givePlayer = Commands.argument("player", EntityArgument.player()).then(givePicture);
+            wallCanvas.then(Commands.literal("give").then(givePlayer));
 
             dispatcher.register(wallCanvas);
         });
     }
 
-    private int givePainting(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> context) {
-        ServerPlayer target = EntityArgument.getPlayer(context, "player");
-        String pictureName = StringArgumentType.getString(context, "picture");
+    private int createWebPicture(CommandSourceStack source, String name, String url) {
+        MinecraftServer server = source.getServer();
+        source.sendSuccess(() -> Component.literal(
+                "Downloading WallCanvas picture '" + name + "'..."), false);
+        CompletableFuture.runAsync(() -> {
+            try {
+                Path imported = ImageImporter.importUrl(url, picturesDirectory, name);
+                Path worldRoot = server.getWorldPath(LevelResource.ROOT);
+                PaintingPackBuilder.rebuildAll(
+                        picturesDirectory,
+                        PaintingPackBuilder.defaultPackRoot(worldRoot),
+                        PaintingPackBuilder.defaultDataPackRoot(worldRoot));
+                server.execute(() -> source.sendSuccess(() -> Component.literal(
+                        "Imported '" + imported.getFileName()
+                                + "'. Restart the server to register the new Painting variant."), false));
+            } catch (Exception exception) {
+                server.execute(() -> source.sendFailure(Component.literal(
+                        "Web import failed: " + safeMessage(exception))));
+            }
+        });
+        return 1;
+    }
+
+    private int givePainting(CommandSourceStack source, ServerPlayer target, String pictureName) {
         if (!isPictureFile(picturesDirectory.resolve(pictureName).normalize())) {
-            context.getSource().sendFailure(Component.literal("Picture not found."));
+            source.sendFailure(Component.literal("Picture not found."));
             return 0;
         }
         ItemStack item = paintingItems.create(
                 new PaintingSpec(pictureName, PaintingSize.DEFAULT),
-                context.getSource().getServer().registryAccess());
+                source.getServer().registryAccess());
         if (!target.getInventory().add(item)) {
             target.drop(item, false);
-            context.getSource().sendFailure(Component.literal(
+            source.sendFailure(Component.literal(
                     "Target inventory is full; Painting was dropped nearby."));
         } else {
-            context.getSource().sendSuccess(() -> Component.literal(
+            source.sendSuccess(() -> Component.literal(
                     "Gave WallCanvas Painting '" + pictureName + "' to "
                             + target.getName().getString() + "."), true);
         }
