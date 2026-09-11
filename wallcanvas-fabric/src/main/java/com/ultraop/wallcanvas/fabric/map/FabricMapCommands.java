@@ -10,6 +10,7 @@ import com.ultraop.wallcanvas.core.map.MapSpec;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -82,8 +83,9 @@ public final class FabricMapCommands {
                 player.sendSystemMessage(Component.literal("Picture not found."));
                 return 0;
             }
+            ServerLevel world = (ServerLevel) player.level();
             UUID id = new FabricMapDisplayManager(picturesDirectory, displayStore)
-                    .create(player.level().getLevel(), new MapSpec(asset, width, height, x, y, z), player.getYRot());
+                    .create(world, new MapSpec(asset, width, height, x, y, z), player.getYRot());
             player.sendSystemMessage(Component.literal("Created WallCanvas Map display " + id + "."));
             return 1;
         } catch (Exception exception) {
@@ -98,7 +100,8 @@ public final class FabricMapCommands {
                 player.sendSystemMessage(Component.literal("Picture not found."));
                 return 0;
             }
-            ItemStack map = new FabricMapDisplayManager(picturesDirectory, displayStore).createMapItem(player.level().getLevel(), asset);
+            ServerLevel world = (ServerLevel) player.level();
+            ItemStack map = new FabricMapDisplayManager(picturesDirectory, displayStore).createMapItem(world, asset);
             if (!player.getInventory().add(map)) player.drop(map, false);
             player.sendSystemMessage(Component.literal("Gave WallCanvas Map for '" + asset + "'."));
             return 1;
@@ -111,7 +114,8 @@ public final class FabricMapCommands {
     private static int remove(ServerPlayer player, String rawId) {
         try {
             UUID id = UUID.fromString(rawId);
-            int removed = new FabricMapDisplayManager(picturesDirectory, displayStore).remove(player.level().getLevel(), id);
+            ServerLevel world = (ServerLevel) player.level();
+            int removed = new FabricMapDisplayManager(picturesDirectory, displayStore).remove(world, id);
             player.sendSystemMessage(Component.literal("Removed " + removed + " map display entity(s)."));
             return 1;
         } catch (IllegalArgumentException exception) {
