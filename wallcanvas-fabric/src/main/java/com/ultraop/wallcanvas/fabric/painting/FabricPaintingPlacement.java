@@ -28,6 +28,8 @@ import java.util.UUID;
 
 /** Fabric adapter for WallCanvas Painting placement and player pickup parity. */
 public final class FabricPaintingPlacement {
+    private static final String SIZE_TAG_PREFIX = "wallcanvas_painting_size|";
+
     private final DisplayStore displayStore;
     private final FabricPaintingItems paintingItems = new FabricPaintingItems();
     private final Map<UUID, PendingPlacement> pending = new HashMap<>();
@@ -68,7 +70,7 @@ public final class FabricPaintingPlacement {
             if (display == null || !display.isPainting()) return InteractionResult.PASS;
 
             if (!serverPlayer.isCreative()) {
-                PaintingSize size = sizeFor(display);
+                PaintingSize size = sizeFor(painting, display);
                 ItemStack item = paintingItems.create(
                         new PaintingSpec(display.assetId(), size), level.registryAccess());
                 ItemEntity drop = new ItemEntity(level,
@@ -106,6 +108,7 @@ public final class FabricPaintingPlacement {
 
                 try {
                     var variant = found.getVariant().value();
+                    found.addTag(SIZE_TAG_PREFIX + request.size());
                     displayStore.add(DisplayDefinition.painting(
                             found.getUUID(), request.assetId(),
                             Math.max(1, variant.width()), Math.max(1, variant.height())));
@@ -117,28 +120,18 @@ public final class FabricPaintingPlacement {
         });
     }
 
-    private static PaintingSize sizeFor(DisplayDefinition display) {
-        try {
-            return PaintingSize.fromName(display.assetId().contains("\n") ? "" : displaySizeMetadata(display));
-        } catch (IllegalArgumentException ignored) {
-            return display.width() >= PaintingSize.LARGE.widthBlocks()
-                    ? PaintingSize.LARGE
-                    : PaintingSize.DEFAULT;
+    private static PaintingSize sizeFor(Painting painting, DisplayDefinition display) {
+        for (String tag : painting.getTags()) {
+            if (!tag.startsWith(SIZE_TAG_PREFIX)) continue;
+            try {
+                return PaintingSize.fromName(tag.substring(SIZE_TAG_PREFIX.length()));
+            } catch (IllegalArgumentException ignored) {
+                break;
+            }
         }
-    }
-
-    /**
-     * DisplayDefinition stores the canonical dimensions but not Painting metadata.
-     * The stable size profile can therefore be reconstructed from its physical size
-     * at the default pixel density; custom pixel density is restored by the item
-     * metadata path when the entity is created.
-     */
-    private static String displaySizeMetadata(DisplayDefinition display) {
-        if (display.width() == PaintingSize.DEFAULT.widthBlocks()
-                && display.height() == PaintingSize.DEFAULT.heightBlocks()) return PaintingSize.DEFAULT.name();
-        if (display.width() == PaintingSize.LARGE.widthBlocks()
-                && display.height() == PaintingSize.LARGE.heightBlocks()) return PaintingSize.LARGE.name();
-        return PaintingSize.of(display.width(), display.height()).name();
+        return display.width() >= PaintingSize.LARGE.widthBlocks()
+                ? PaintingSize.LARGE
+                : PaintingSize.DEFAULT;
     }
 
     private static boolean isWallCanvasItem(ItemStack stack) {
