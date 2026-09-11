@@ -30,8 +30,9 @@ public final class PaintingResourcePackGenerator {
         Path file = PaintingResourcePackLayout.variantJson(packRoot, definition.variantId());
         Files.createDirectories(file.getParent());
         String id = definition.variantId().substring(definition.variantId().indexOf(':') + 1);
+        String assetId = PaintingResourcePackLayout.NAMESPACE + ":painting/" + id;
         String json = GSON.toJson(new VariantJson(
-                definition.assetId(),
+                assetId,
                 definition.width(),
                 definition.height(),
                 "WallCanvas",
