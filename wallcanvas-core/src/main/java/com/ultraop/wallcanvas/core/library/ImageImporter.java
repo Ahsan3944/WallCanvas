@@ -19,6 +19,7 @@ import java.util.Locale;
 
 public final class ImageImporter {
     private static final int MAX_BYTES = 32 * 1024 * 1024;
+    private static final int MAX_REDIRECTS = 5;
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20);
 
     private ImageImporter() {
@@ -30,16 +31,10 @@ public final class ImageImporter {
         rejectPrivateHost(uri.getHost());
 
         String safeName = sanitize(fileName);
-        if (safeName.isBlank()) {
-            throw new IOException("Picture name cannot be blank");
-        }
+        if (safeName.isBlank()) throw new IOException("Picture name cannot be blank");
         String extension = extensionFromPath(uri.getPath());
-        if (!WallCanvasCore.isSupportedImageExtension(extension)) {
-            extension = "png";
-        }
-        if (!safeName.toLowerCase(Locale.ROOT).endsWith("." + extension.toLowerCase(Locale.ROOT))) {
-            safeName += "." + extension;
-        }
+        if (!WallCanvasCore.isSupportedImageExtension(extension)) extension = "png";
+        if (!safeName.toLowerCase(Locale.ROOT).endsWith("." + extension)) safeName += "." + extension;
 
         Files.createDirectories(pictureDirectory);
         Path destination = pictureDirectory.resolve(safeName).normalize();
@@ -51,17 +46,37 @@ public final class ImageImporter {
                 .connectTimeout(REQUEST_TIMEOUT)
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
-        HttpRequest request = HttpRequest.newBuilder(uri)
-                .timeout(REQUEST_TIMEOUT)
-                .header("User-Agent", "WallCanvas/0.1")
-                .header("Accept", "image/png,image/jpeg,image/webp;q=0.9,*/*;q=0.1")
-                .GET()
-                .build();
 
-        HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        if (response.statusCode() / 100 != 2) {
-            throw new IOException("Image download failed: HTTP " + response.statusCode());
+        HttpResponse<byte[]> response = null;
+        for (int redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
+            rejectPrivateHost(uri.getHost());
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                    .timeout(REQUEST_TIMEOUT)
+                    .header("User-Agent", "WallCanvas/0.1")
+                    .header("Accept", "image/png,image/jpeg,image/webp;q=0.9,*/*;q=0.1")
+                    .GET()
+                    .build();
+            response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            int status = response.statusCode();
+            if (status / 100 == 2) break;
+            if (status / 100 != 3) {
+                throw new IOException("Image download failed: HTTP " + status);
+            }
+            String location = response.headers().firstValue("Location").orElse(null);
+            if (location == null || location.isBlank()) {
+                throw new IOException("Image redirect has no Location header");
+            }
+            try {
+                uri = uri.resolve(location);
+            } catch (IllegalArgumentException exception) {
+                throw new IOException("Invalid image redirect URL", exception);
+            }
+            uri = parseHttpsUri(uri.toString());
         }
+        if (response == null || response.statusCode() / 100 != 2) {
+            throw new IOException("Too many image redirects");
+        }
+
         byte[] body = response.body();
         if (body.length == 0) throw new IOException("Downloaded file is empty");
         if (body.length > MAX_BYTES) throw new IOException("Image is larger than 32 MiB");
@@ -70,17 +85,12 @@ public final class ImageImporter {
         try (ByteArrayInputStream input = new ByteArrayInputStream(body)) {
             image = ImageIO.read(input);
         }
-        if (image == null) {
+        if (image == null || image.getWidth() < 1 || image.getHeight() < 1) {
             throw new IOException("Downloaded content is not a supported PNG, JPEG or WebP image");
-        }
-        if (image.getWidth() < 1 || image.getHeight() < 1) {
-            throw new IOException("Image has invalid dimensions");
         }
 
         String detectedExtension = detectExtension(body);
-        if (detectedExtension == null) {
-            throw new IOException("Downloaded content is not a recognized image format");
-        }
+        if (detectedExtension == null) throw new IOException("Downloaded content is not a recognized image format");
         if (!safeName.toLowerCase(Locale.ROOT).endsWith("." + detectedExtension)) {
             safeName = replaceExtension(safeName, detectedExtension);
             destination = pictureDirectory.resolve(safeName).normalize();
