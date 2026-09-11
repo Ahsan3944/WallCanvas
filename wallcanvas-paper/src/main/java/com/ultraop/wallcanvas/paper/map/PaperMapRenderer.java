@@ -3,9 +3,9 @@ package com.ultraop.wallcanvas.paper.map;
 import org.bukkit.map.MapCanvas;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
-import org.bukkit.map.MapPalette;
 import org.bukkit.entity.Player;
 
+import java.awt.Color;
 import java.awt.image.BufferedImage;
 
 /** Renders one 128x128 tile of a WallCanvas picture onto a normal Minecraft map. */
@@ -30,10 +30,10 @@ public final class PaperMapRenderer extends MapRenderer {
                 int argb = image.getRGB(offsetX + x, offsetY + y);
                 int alpha = (argb >>> 24) & 0xff;
                 if (alpha < 8) {
-                    canvas.setPixel(x, y, MapPalette.TRANSPARENT);
+                    canvas.setPixelColor(x, y, null);
                     continue;
                 }
-                canvas.setPixel(x, y, MapPalette.matchColor(
+                canvas.setPixelColor(x, y, new Color(
                         (argb >>> 16) & 0xff,
                         (argb >>> 8) & 0xff,
                         argb & 0xff));
