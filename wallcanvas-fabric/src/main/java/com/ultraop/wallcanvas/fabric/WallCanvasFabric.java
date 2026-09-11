@@ -6,6 +6,7 @@ import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageImporter;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.painting.PaintingPackBuilder;
+import com.ultraop.wallcanvas.core.painting.PaintingResourcePackArchive;
 import com.ultraop.wallcanvas.core.painting.PaintingSize;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import com.ultraop.wallcanvas.fabric.map.FabricMapCommands;
@@ -14,6 +15,7 @@ import com.ultraop.wallcanvas.fabric.painting.FabricPaintingPlacement;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -32,9 +34,12 @@ public final class WallCanvasFabric implements ModInitializer {
     private static Path picturesDirectory;
     private static FabricPaintingItems paintingItems;
     private static DisplayStore displayStore;
+    private static FabricResourcePackDelivery resourcePackDelivery;
 
     @Override
     public void onInitialize() {
+        resourcePackDelivery = new FabricResourcePackDelivery(FabricLoader.getInstance().getConfigDir());
+        resourcePackDelivery.register();
         ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             var wallCanvas = Commands.literal("wallcanvas");
@@ -93,10 +98,13 @@ public final class WallCanvasFabric implements ModInitializer {
             try {
                 Path imported = ImageImporter.importUrl(url, picturesDirectory, name);
                 Path worldRoot = server.getWorldPath(LevelResource.ROOT);
+                Path packRoot = PaintingPackBuilder.defaultPackRoot(worldRoot);
                 PaintingPackBuilder.rebuildAll(
                         picturesDirectory,
-                        PaintingPackBuilder.defaultPackRoot(worldRoot),
+                        packRoot,
                         PaintingPackBuilder.defaultDataPackRoot(worldRoot));
+                Path archive = PaintingResourcePackArchive.zip(packRoot);
+                resourcePackDelivery.initialize(archive);
                 server.execute(() -> source.sendSuccess(() -> Component.literal(
                         "Imported '" + imported.getFileName()
                                 + "'. Restart the server to register the new Painting variant."), false));
@@ -151,8 +159,17 @@ public final class WallCanvasFabric implements ModInitializer {
             displayStore.load();
             FabricMapCommands.configure(picturesDirectory, displayStore);
             var variants = PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot, dataPackRoot);
+            Path archive = PaintingResourcePackArchive.zip(packRoot);
+            resourcePackDelivery.initialize(archive);
             System.out.println("[WallCanvas] Generated " + variants.size()
                     + " Painting variant(s) before world loading at " + packRoot + " and " + dataPackRoot);
+            if (resourcePackDelivery.isConfigured()) {
+                System.out.println("[WallCanvas] Fabric resource pack delivery enabled: "
+                        + resourcePackDelivery.url());
+            } else {
+                System.out.println("[WallCanvas] Fabric resource pack delivery disabled. Configure "
+                        + "config/wallcanvas.properties -> resource-pack.url");
+            }
         } catch (IOException exception) {
             throw new RuntimeException("Unable to initialize WallCanvas storage/resources", exception);
         }
