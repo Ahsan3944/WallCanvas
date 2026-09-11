@@ -11,7 +11,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.MapItem;
 import net.minecraft.world.level.saveddata.maps.MapId;
@@ -65,7 +64,6 @@ public final class FabricMapDisplayManager {
                     display.setYRot(yaw);
                     display.setXRot(0);
                     display.setItemStack(map);
-                    display.setItemDisplayContext(ItemDisplayContext.FIXED);
                     display.setNoGravity(true);
                     display.addTag(tag(displayId, spec.assetId(), tileX, tileY, spec.tilesWide(), spec.tilesHigh()));
                     world.addFreshEntity(display);
@@ -97,7 +95,7 @@ public final class FabricMapDisplayManager {
 
     public int remove(ServerLevel world, UUID displayId) throws IOException {
         int removed = 0;
-        for (Entity entity : new ArrayList<>(world.getEntities().getAll())) {
+        for (Entity entity : new ArrayList<>(world.getAllEntities())) {
             if (!(entity instanceof Display.ItemDisplay display)) continue;
             if (hasDisplayId(display, displayId)) {
                 display.discard();
@@ -145,7 +143,9 @@ public final class FabricMapDisplayManager {
         private static final int[] COLORS = new int[248];
         private static final java.util.Map<Integer, Byte> CACHE = new java.util.HashMap<>();
         static {
-            for (int i = 0; i < COLORS.length; i++) COLORS[i] = net.minecraft.world.level.material.MapColor.getRenderColor(i);
+            for (int i = 0; i < COLORS.length; i++) {
+                COLORS[i] = net.minecraft.world.level.material.MapColor.getColorFromPackedId(i);
+            }
         }
 
         static synchronized byte match(int argb) {
