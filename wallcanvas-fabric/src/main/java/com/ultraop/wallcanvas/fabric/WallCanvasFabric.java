@@ -8,6 +8,7 @@ import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.painting.PaintingPackBuilder;
 import com.ultraop.wallcanvas.core.painting.PaintingSize;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
+import com.ultraop.wallcanvas.fabric.map.FabricMapCommands;
 import com.ultraop.wallcanvas.fabric.painting.FabricPaintingItems;
 import com.ultraop.wallcanvas.fabric.painting.FabricPaintingPlacement;
 import net.fabricmc.api.ModInitializer;
@@ -35,6 +36,7 @@ public final class WallCanvasFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
+        FabricMapCommands.register();
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             var wallCanvas = Commands.literal("wallcanvas");
 
@@ -147,6 +149,7 @@ public final class WallCanvasFabric implements ModInitializer {
         try {
             Files.createDirectories(picturesDirectory);
             displayStore.load();
+            FabricMapCommands.configure(picturesDirectory, displayStore);
             var variants = PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot, dataPackRoot);
             System.out.println("[WallCanvas] Generated " + variants.size()
                     + " Painting variant(s) before world loading at " + packRoot + " and " + dataPackRoot);
