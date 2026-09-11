@@ -13,7 +13,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.item.MapItem;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
@@ -80,6 +79,20 @@ public final class FabricMapDisplayManager {
             if (exception instanceof IOException io) throw io;
             throw new IOException("Unable to create map display", exception);
         }
+    }
+
+    public ItemStack createMapItem(ServerLevel world, String assetId) throws IOException {
+        Path picture = picturesDirectory.resolve(assetId).normalize();
+        if (!isPictureFile(picture)) throw new IOException("Picture not found: " + assetId);
+        MapSpec spec = MapSpec.single(assetId, 0, 0, 0);
+        BufferedImage prepared = MapImageRenderer.prepare(picture, spec);
+        ItemStack map = MapItem.create(world, 0, 0, (byte) 0, false, false);
+        MapId mapId = map.get(DataComponents.MAP_ID);
+        if (mapId == null) throw new IOException("Minecraft did not assign a map id");
+        MapItemSavedData state = MapItem.getSavedData(mapId, world);
+        if (state == null) throw new IOException("Unable to access map state " + mapId.id());
+        paint(state, prepared, 0, 0);
+        return map;
     }
 
     public int remove(ServerLevel world, UUID displayId) throws IOException {
