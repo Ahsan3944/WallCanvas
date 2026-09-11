@@ -11,6 +11,7 @@ public final class PaintingVariantFactory {
                 variantId,
                 spec.size().widthBlocks(),
                 spec.size().heightBlocks(),
+                spec.size().pixelsPerBlock(),
                 spec.assetId()
         );
     }
