@@ -17,7 +17,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.storage.LevelResource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,7 +50,7 @@ public final class FabricMapCommands {
                 .suggests(pictureSuggestions)
                 .executes(context -> create(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture")));
 
-        var height = Commands.argument("height", IntegerArgumentType.integer(1, 16))
+        var height = Commands.argument("height", IntegerArgumentType.integer(1, 64))
                 .executes(context -> create(context.getSource().getPlayerOrException(),
                         StringArgumentType.getString(context, "picture"),
                         DoubleArgumentType.getDouble(context, "x"),
@@ -59,7 +58,7 @@ public final class FabricMapCommands {
                         DoubleArgumentType.getDouble(context, "z"),
                         IntegerArgumentType.getInteger(context, "width"),
                         IntegerArgumentType.getInteger(context, "height")));
-        var width = Commands.argument("width", IntegerArgumentType.integer(1, 16)).then(height);
+        var width = Commands.argument("width", IntegerArgumentType.integer(1, 64)).then(height);
         var z = Commands.argument("z", DoubleArgumentType.doubleArg())
                 .executes(context -> create(context.getSource().getPlayerOrException(),
                         StringArgumentType.getString(context, "picture"),
