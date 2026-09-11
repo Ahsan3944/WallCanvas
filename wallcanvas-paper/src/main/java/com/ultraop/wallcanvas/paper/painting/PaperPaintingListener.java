@@ -41,7 +41,6 @@ public final class PaperPaintingListener implements Listener {
     @EventHandler
     public void onHangingPlace(HangingPlaceEvent event) {
         if (!(event.getEntity() instanceof Painting painting)) return;
-
         ItemStack source = event.getItemStack();
         if (!isWallCanvasItem(source)) return;
 
@@ -52,8 +51,7 @@ public final class PaperPaintingListener implements Listener {
 
         copyMetadata(painting, assetId, size);
         try {
-            displayStore.add(DisplayDefinition.painting(
-                    painting.getUniqueId(), assetId,
+            displayStore.add(DisplayDefinition.painting(painting.getUniqueId(), assetId,
                     Math.max(1, (int) painting.getWidth()), Math.max(1, (int) painting.getHeight())));
         } catch (IOException exception) {
             event.setCancelled(true);
@@ -65,26 +63,28 @@ public final class PaperPaintingListener implements Listener {
     @EventHandler
     public void onHangingBreak(HangingBreakEvent event) {
         if (!(event.getEntity() instanceof Painting painting) || !isWallCanvasPainting(painting)) return;
-
         event.setCancelled(true);
 
         if (event instanceof HangingBreakByEntityEvent byEntity
-                && byEntity.getRemover() instanceof Player player
-                && player.getGameMode() == GameMode.CREATIVE) {
-            removeFromStore(painting);
-            painting.remove();
-            return;
+                && byEntity.getRemover() instanceof Player player) {
+            if (player.getGameMode() == GameMode.CREATIVE) {
+                try {
+                    ItemStack copy = createItem(painting);
+                    if (!player.getInventory().addItem(copy).isEmpty()) {
+                        player.getWorld().dropItemNaturally(player.getLocation(), copy);
+                    }
+                    removeFromStore(painting);
+                    painting.remove();
+                } catch (Exception exception) {
+                    plugin.getLogger().warning("Unable to duplicate WallCanvas Painting "
+                            + painting.getUniqueId() + ": " + exception.getMessage());
+                }
+                return;
+            }
         }
 
         try {
-            String assetId = painting.getPersistentDataContainer().get(assetKey, PersistentDataType.STRING);
-            if (assetId == null || assetId.isBlank()) {
-                plugin.getLogger().warning("WallCanvas Painting " + painting.getUniqueId()
-                        + " has no asset metadata; keeping it intact.");
-                return;
-            }
-            PaintingSize size = sizeFor(painting);
-            ItemStack item = paintingItems.create(new PaintingSpec(assetId, size));
+            ItemStack item = createItem(painting);
             painting.getWorld().dropItemNaturally(painting.getLocation(), item);
             removeFromStore(painting);
             painting.remove();
@@ -93,6 +93,14 @@ public final class PaperPaintingListener implements Listener {
             plugin.getLogger().warning("Unable to create WallCanvas Painting drop for "
                     + painting.getUniqueId() + ": " + exception.getMessage());
         }
+    }
+
+    private ItemStack createItem(Painting painting) {
+        String assetId = painting.getPersistentDataContainer().get(assetKey, PersistentDataType.STRING);
+        if (assetId == null || assetId.isBlank()) {
+            throw new IllegalStateException("Painting has no asset metadata");
+        }
+        return paintingItems.create(new PaintingSpec(assetId, sizeFor(painting)));
     }
 
     private void removeFromStore(Painting painting) {
