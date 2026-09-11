@@ -13,7 +13,7 @@ public final class PaintingVariantIds {
 
     public static String forAsset(String assetId, PaintingSize size) {
         String normalized = assetId.replace('\\', '/').trim().toLowerCase(java.util.Locale.ROOT);
-        String hash = sha256(normalized + "|" + size.name()).substring(0, 16);
+        String hash = sha256(normalized + "|" + size.widthBlocks() + "x" + size.heightBlocks()).substring(0, 16);
         return NAMESPACE + ":picture_" + hash;
     }
 
