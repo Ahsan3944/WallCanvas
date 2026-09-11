@@ -39,6 +39,8 @@ public final class PaperMapDisplayManager {
     private final NamespacedKey assetKey;
     private final NamespacedKey tileXKey;
     private final NamespacedKey tileYKey;
+    private final NamespacedKey widthKey;
+    private final NamespacedKey heightKey;
     private final NamespacedKey mapIdKey;
 
     public PaperMapDisplayManager(JavaPlugin plugin, Path picturesDirectory, DisplayStore displayStore) {
@@ -49,6 +51,8 @@ public final class PaperMapDisplayManager {
         this.assetKey = new NamespacedKey(plugin, "map_asset");
         this.tileXKey = new NamespacedKey(plugin, "map_tile_x");
         this.tileYKey = new NamespacedKey(plugin, "map_tile_y");
+        this.widthKey = new NamespacedKey(plugin, "map_width");
+        this.heightKey = new NamespacedKey(plugin, "map_height");
         this.mapIdKey = new NamespacedKey(plugin, "map_id");
     }
 
@@ -73,8 +77,8 @@ public final class PaperMapDisplayManager {
                     double yawRad = Math.toRadians(yaw);
                     double rightX = Math.cos(yawRad);
                     double rightZ = -Math.sin(yawRad);
-                    double xOffset = (tileX - (spec.tilesWide() - 1) / 2.0) * 1.0;
-                    double yOffset = ((spec.tilesHigh() - 1) / 2.0 - tileY) * 1.0;
+                    double xOffset = (tileX - (spec.tilesWide() - 1) / 2.0);
+                    double yOffset = ((spec.tilesHigh() - 1) / 2.0 - tileY);
                     Location location = new Location(player.world(),
                             spec.centerX() + rightX * xOffset,
                             spec.centerY() + yOffset,
@@ -89,7 +93,8 @@ public final class PaperMapDisplayManager {
                     display.setPersistent(true);
                     display.setInvulnerable(true);
                     display.setViewRange(64.0f);
-                    writeMetadata(display, displayId, spec.assetId(), tileX, tileY, map.getId());
+                    writeMetadata(display, displayId, spec.assetId(), tileX, tileY,
+                            spec.tilesWide(), spec.tilesHigh(), map.getId());
                     spawned.add(display);
                 }
             }
@@ -138,29 +143,23 @@ public final class PaperMapDisplayManager {
                 String asset = pdc.get(assetKey, PersistentDataType.STRING);
                 Integer tileX = pdc.get(tileXKey, PersistentDataType.INTEGER);
                 Integer tileY = pdc.get(tileYKey, PersistentDataType.INTEGER);
+                Integer width = pdc.get(widthKey, PersistentDataType.INTEGER);
+                Integer height = pdc.get(heightKey, PersistentDataType.INTEGER);
                 Integer mapId = pdc.get(mapIdKey, PersistentDataType.INTEGER);
-                if (asset == null || tileX == null || tileY == null || mapId == null) continue;
+                if (asset == null || tileX == null || tileY == null || width == null || height == null || mapId == null) continue;
                 try {
                     Path picture = picturesDirectory.resolve(asset).normalize();
                     if (!isPictureFile(picture)) continue;
                     MapView map = Bukkit.getMap(mapId);
                     if (map == null) continue;
                     BufferedImage prepared = MapImageRenderer.prepare(picture,
-                            new MapSpec(asset, inferWidth(display), inferHeight(display), display.getX(), display.getY(), display.getZ()));
+                            new MapSpec(asset, width, height, display.getX(), display.getY(), display.getZ()));
                     prepareMap(map, prepared, tileX, tileY);
                 } catch (Exception exception) {
                     plugin.getLogger().warning("Unable to restore WallCanvas map renderer: " + exception.getMessage());
                 }
             }
         }
-    }
-
-    private int inferWidth(ItemDisplay ignored) {
-        return 1;
-    }
-
-    private int inferHeight(ItemDisplay ignored) {
-        return 1;
     }
 
     private void prepareMap(MapView map, BufferedImage image, int tileX, int tileY) {
@@ -170,12 +169,15 @@ public final class PaperMapDisplayManager {
         map.addRenderer(new PaperMapRenderer(image, tileX * 128, tileY * 128));
     }
 
-    private void writeMetadata(ItemDisplay display, UUID id, String asset, int tileX, int tileY, int mapId) {
+    private void writeMetadata(ItemDisplay display, UUID id, String asset, int tileX, int tileY,
+                               int width, int height, int mapId) {
         PersistentDataContainer pdc = display.getPersistentDataContainer();
         pdc.set(displayKey, PersistentDataType.STRING, id.toString());
         pdc.set(assetKey, PersistentDataType.STRING, asset);
         pdc.set(tileXKey, PersistentDataType.INTEGER, tileX);
         pdc.set(tileYKey, PersistentDataType.INTEGER, tileY);
+        pdc.set(widthKey, PersistentDataType.INTEGER, width);
+        pdc.set(heightKey, PersistentDataType.INTEGER, height);
         pdc.set(mapIdKey, PersistentDataType.INTEGER, mapId);
     }
 
