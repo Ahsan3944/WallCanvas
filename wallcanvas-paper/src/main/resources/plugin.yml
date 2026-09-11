@@ -6,8 +6,8 @@ authors: [UltraOP]
 description: Server-side custom wall art and map displays.
 commands:
   wallcanvas:
-    description: WallCanvas picture library and display commands.
-    usage: /wallcanvas <list|info|create|give> [player] [picture]
+    description: WallCanvas picture library, painting and map display commands.
+    usage: /wallcanvas <list|info|create|give|map> ...
     permission: wallcanvas.use
 permissions:
   wallcanvas.use:
