@@ -107,7 +107,7 @@ public final class PaperPaintingListener implements Listener {
     private PaintingSize sizeFor(Painting painting) {
         String storedSize = painting.getPersistentDataContainer().get(sizeKey, PersistentDataType.STRING);
         try {
-            return storedSize == null ? PaintingSize.DEFAULT : PaintingSize.valueOf(storedSize);
+            return storedSize == null ? PaintingSize.DEFAULT : PaintingSize.fromName(storedSize);
         } catch (IllegalArgumentException ignored) {
             return painting.getWidth() >= PaintingSize.LARGE.widthBlocks()
                     ? PaintingSize.LARGE : PaintingSize.DEFAULT;
