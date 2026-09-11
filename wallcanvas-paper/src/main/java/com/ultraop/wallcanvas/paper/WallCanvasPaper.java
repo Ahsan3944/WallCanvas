@@ -4,10 +4,12 @@ import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageImporter;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
+import com.ultraop.wallcanvas.core.map.MapSpec;
 import com.ultraop.wallcanvas.core.painting.PaintingPackBuilder;
 import com.ultraop.wallcanvas.core.painting.PaintingResourcePackArchive;
 import com.ultraop.wallcanvas.core.painting.PaintingSize;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
+import com.ultraop.wallcanvas.paper.map.PaperMapDisplayManager;
 import com.ultraop.wallcanvas.paper.painting.PaperPaintingItems;
 import com.ultraop.wallcanvas.paper.painting.PaperPaintingListener;
 import org.bukkit.Bukkit;
@@ -28,12 +30,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor, org.bukkit.command.TabCompleter, Listener {
     private Path picturesDirectory;
     private PaperPaintingItems paintingItems;
     private DisplayStore displayStore;
+    private PaperMapDisplayManager mapManager;
     private String resourcePackUrl = "";
     private byte[] resourcePackHash = new byte[0];
 
@@ -67,8 +71,10 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
         }
 
         paintingItems = new PaperPaintingItems(this);
+        mapManager = new PaperMapDisplayManager(this, picturesDirectory, displayStore);
         getServer().getPluginManager().registerEvents(new PaperPaintingListener(this, displayStore), this);
         getServer().getPluginManager().registerEvents(this, this);
+        Bukkit.getScheduler().runTask(this, () -> mapManager.restoreRenderers());
 
         var command = getCommand("wallcanvas");
         if (command == null) {
@@ -102,12 +108,14 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             }
             return true;
         }
+
         if (args[0].equalsIgnoreCase("info") && args.length >= 2) {
             Path picture = picturesDirectory.resolve(args[1]).normalize();
             if (!isPictureFile(picture)) { sender.sendMessage("Picture not found."); return true; }
             sender.sendMessage("Picture: " + picture.getFileName());
             return true;
         }
+
         if (args[0].equalsIgnoreCase("create") && args.length >= 4 && args[1].equalsIgnoreCase("web")) {
             String name = args[2];
             String url = args[3];
@@ -126,6 +134,7 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             });
             return true;
         }
+
         if (args[0].equalsIgnoreCase("give") && args.length >= 3) {
             Player target = Bukkit.getPlayerExact(args[1]);
             if (target == null) { sender.sendMessage("Player not found or offline."); return true; }
@@ -141,17 +150,100 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             }
             return true;
         }
-        sender.sendMessage("Usage: /wallcanvas list | /wallcanvas info <picture> | /wallcanvas create web <name> <url> | /wallcanvas give <player> <picture>");
+
+        if (args[0].equalsIgnoreCase("map")) {
+            return handleMapCommand(sender, args);
+        }
+
+        sender.sendMessage("Usage: /wallcanvas list | /wallcanvas info <picture> | /wallcanvas create web <name> <url> | /wallcanvas give <player> <picture> | /wallcanvas map <create|give|remove> ...");
+        return true;
+    }
+
+    private boolean handleMapCommand(CommandSender sender, String[] args) {
+        if (args.length >= 2 && args[1].equalsIgnoreCase("give")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("A player must use /wallcanvas map give.");
+                return true;
+            }
+            if (args.length < 3 || !isPictureFile(picturesDirectory.resolve(args[2]).normalize())) {
+                sender.sendMessage("Usage: /wallcanvas map give <picture>");
+                return true;
+            }
+            try {
+                player.getInventory().addItem(mapManager.createMapItem(player.getWorld(), args[2]));
+                sender.sendMessage("Gave WallCanvas Map for '" + args[2] + "'.");
+            } catch (IOException exception) {
+                sender.sendMessage("Unable to create map: " + safeMessage(exception));
+            }
+            return true;
+        }
+
+        if (args.length >= 2 && args[1].equalsIgnoreCase("create")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("A player must use /wallcanvas map create.");
+                return true;
+            }
+            if (args.length < 3 || !isPictureFile(picturesDirectory.resolve(args[2]).normalize())) {
+                sender.sendMessage("Usage: /wallcanvas map create <picture> [x y z] [width height]");
+                return true;
+            }
+            try {
+                String asset = args[2];
+                double x = player.getX();
+                double y = player.getY();
+                double z = player.getZ();
+                int width = 1;
+                int height = 1;
+                if (args.length >= 6) {
+                    x = Double.parseDouble(args[3]);
+                    y = Double.parseDouble(args[4]);
+                    z = Double.parseDouble(args[5]);
+                }
+                if (args.length >= 8) {
+                    width = Integer.parseInt(args[6]);
+                    height = Integer.parseInt(args[7]);
+                }
+                MapSpec spec = new MapSpec(asset, width, height, x, y, z);
+                UUID id = mapManager.create(() -> player.getWorld(), spec, player.getYaw());
+                sender.sendMessage("Created WallCanvas Map display " + id + " at "
+                        + x + ", " + y + ", " + z + " (" + width + "x" + height + ").");
+            } catch (NumberFormatException exception) {
+                sender.sendMessage("Coordinates and map size must be valid numbers.");
+            } catch (IllegalArgumentException | IOException exception) {
+                sender.sendMessage("Unable to create map: " + safeMessage(exception));
+            }
+            return true;
+        }
+
+        if (args.length >= 2 && args[1].equalsIgnoreCase("remove")) {
+            if (args.length < 3) {
+                sender.sendMessage("Usage: /wallcanvas map remove <display-uuid>");
+                return true;
+            }
+            try {
+                int removed = mapManager.remove(UUID.fromString(args[2]));
+                sender.sendMessage("Removed " + removed + " map display entity(s).");
+            } catch (IllegalArgumentException exception) {
+                sender.sendMessage("Invalid display UUID.");
+            } catch (IOException exception) {
+                sender.sendMessage("Unable to remove map: " + safeMessage(exception));
+            }
+            return true;
+        }
+
+        sender.sendMessage("Usage: /wallcanvas map create <picture> [x y z] [width height] | /wallcanvas map give <picture> | /wallcanvas map remove <display-uuid>");
         return true;
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        if (args.length == 1) return filter(List.of("list", "info", "create", "give"), args[0]);
+        if (args.length == 1) return filter(List.of("list", "info", "create", "give", "map"), args[0]);
         if (args.length == 2 && args[0].equalsIgnoreCase("info")) return pictureNames(args[1]);
         if (args.length == 2 && args[0].equalsIgnoreCase("create")) return filter(List.of("web"), args[1]);
         if (args.length == 2 && args[0].equalsIgnoreCase("give")) return filter(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList(), args[1]);
         if (args.length == 3 && args[0].equalsIgnoreCase("give")) return pictureNames(args[2]);
+        if (args.length == 2 && args[0].equalsIgnoreCase("map")) return filter(List.of("create", "give", "remove"), args[1]);
+        if (args.length == 3 && args[0].equalsIgnoreCase("map") && (args[1].equalsIgnoreCase("create") || args[1].equalsIgnoreCase("give"))) return pictureNames(args[2]);
         return List.of();
     }
 
