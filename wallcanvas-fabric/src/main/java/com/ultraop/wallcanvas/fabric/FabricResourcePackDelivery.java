@@ -1,6 +1,5 @@
 package com.ultraop.wallcanvas.fabric;
 
-import com.mojang.authlib.minecraft.client.MinecraftClient;
 import com.ultraop.wallcanvas.core.painting.PaintingResourcePackArchive;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.network.chat.Component;
