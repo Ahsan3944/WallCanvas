@@ -4,6 +4,7 @@ import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.map.MapImageRenderer;
+import com.ultraop.wallcanvas.core.map.MapPlacement;
 import com.ultraop.wallcanvas.core.map.MapSpec;
 import com.ultraop.wallcanvas.core.model.DisplayDefinition;
 import net.minecraft.core.component.DataComponents;
@@ -52,15 +53,10 @@ public final class FabricMapDisplayManager {
                     if (state == null) throw new IOException("Unable to access map state " + mapId.id());
                     paint(state, prepared, tileX * 128, tileY * 128);
 
-                    double yawRad = Math.toRadians(yaw);
-                    double rightX = Math.cos(yawRad);
-                    double rightZ = -Math.sin(yawRad);
-                    double xOffset = tileX - (spec.tilesWide() - 1) / 2.0;
-                    double yOffset = (spec.tilesHigh() - 1) / 2.0 - tileY;
                     Display.ItemDisplay display = new Display.ItemDisplay(EntityType.ITEM_DISPLAY, world);
-                    display.setPos(spec.centerX() + rightX * xOffset,
-                            spec.centerY() + yOffset,
-                            spec.centerZ() + rightZ * xOffset);
+                    display.setPos(MapPlacement.x(spec.centerX(), yaw, tileX, spec.tilesWide()),
+                            MapPlacement.y(spec.centerY(), tileY, spec.tilesHigh()),
+                            MapPlacement.z(spec.centerZ(), yaw, tileX, spec.tilesWide()));
                     display.setYRot(yaw);
                     display.setXRot(0);
                     display.setItemStack(map);
