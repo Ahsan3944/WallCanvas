@@ -17,7 +17,7 @@ public final class PaintingResourcePackBuilder {
         Map<String, PaintingVariantDefinition> definitions = new LinkedHashMap<>();
         for (Path picture : ImageLibrary.scan(picturesDirectory)) {
             String assetId = picture.getFileName().toString();
-            for (PaintingSize size : PaintingSize.values()) {
+            for (PaintingSize size : new PaintingSize[]{PaintingSize.DEFAULT, PaintingSize.LARGE}) {
                 PaintingVariantDefinition definition = PaintingVariantFactory.create(new PaintingSpec(assetId, size));
                 PaintingResourcePack.writeVariant(packRoot, definition);
                 definitions.put(definition.variantId(), definition);
