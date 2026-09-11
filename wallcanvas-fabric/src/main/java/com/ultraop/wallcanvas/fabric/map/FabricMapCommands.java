@@ -7,18 +7,22 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
+import com.ultraop.wallcanvas.core.library.ImageImporter;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.map.MapSpec;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.storage.LevelResource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 public final class FabricMapCommands {
     private static Path picturesDirectory;
@@ -66,7 +70,15 @@ public final class FabricMapCommands {
         var y = Commands.argument("y", DoubleArgumentType.doubleArg()).then(z);
         var x = Commands.argument("x", DoubleArgumentType.doubleArg()).then(y);
         createPicture.then(x);
-        var create = Commands.literal("create").then(createPicture);
+
+        var webUrl = Commands.argument("url", StringArgumentType.string())
+                .executes(context -> createWeb(context.getSource(),
+                        StringArgumentType.getString(context, "name"),
+                        StringArgumentType.getString(context, "url")));
+        var webName = Commands.argument("name", StringArgumentType.word()).then(webUrl);
+        var web = Commands.literal("web").then(webName);
+
+        var create = Commands.literal("create").then(createPicture).then(web);
 
         var givePicture = Commands.argument("picture", StringArgumentType.word())
                 .suggests(pictureSuggestions)
@@ -103,6 +115,41 @@ public final class FabricMapCommands {
             player.sendSystemMessage(Component.literal("Unable to create map: " + safeMessage(exception)));
             return 0;
         }
+    }
+
+    private static int createWeb(CommandSourceStack source, String name, String url) {
+        MinecraftServer server = source.getServer();
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            source.sendFailure(Component.literal("This command must be run by a player."));
+            return 0;
+        }
+        double x = player.getX();
+        double y = player.getY();
+        double z = player.getZ();
+        float yaw = player.getYRot();
+        source.sendSuccess(() -> Component.literal("Downloading WallCanvas Map picture '" + name + "'..."), false);
+        CompletableFuture.runAsync(() -> {
+            try {
+                Path imported = ImageImporter.importUrl(url, picturesDirectory, name);
+                server.execute(() -> {
+                    try {
+                        ServerLevel world = (ServerLevel) player.level();
+                        String asset = imported.getFileName().toString();
+                        UUID id = new FabricMapDisplayManager(picturesDirectory, displayStore)
+                                .create(world, new MapSpec(asset, 1, 1, x, y, z), yaw);
+                        source.sendSuccess(() -> Component.literal(
+                                "Imported '" + asset + "' and created WallCanvas Map display " + id + "."), false);
+                    } catch (Exception exception) {
+                        source.sendFailure(Component.literal("Unable to create map: " + safeMessage(exception)));
+                    }
+                });
+            } catch (Exception exception) {
+                server.execute(() -> source.sendFailure(Component.literal(
+                        "Web map import failed: " + safeMessage(exception))));
+            }
+        });
+        return 1;
     }
 
     private static int give(ServerPlayer player, String asset) {
