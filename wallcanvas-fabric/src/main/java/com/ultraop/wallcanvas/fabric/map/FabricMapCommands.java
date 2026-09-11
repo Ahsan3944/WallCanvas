@@ -9,7 +9,6 @@ import com.ultraop.wallcanvas.core.map.MapSpec;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -34,33 +33,23 @@ public final class FabricMapCommands {
             var map = Commands.literal("map")
                     .then(Commands.literal("create")
                             .then(Commands.argument("picture", StringArgumentType.word())
-                                    .executes(context -> create(context.getSource().getPlayerOrException(),
-                                            StringArgumentType.getString(context, "picture")))
+                                    .executes(context -> create(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture")))
                                     .then(Commands.argument("x", DoubleArgumentType.doubleArg())
                                             .then(Commands.argument("y", DoubleArgumentType.doubleArg())
                                                     .then(Commands.argument("z", DoubleArgumentType.doubleArg())
-                                                            .executes(context -> create(context.getSource().getPlayerOrException(),
-                                                                    StringArgumentType.getString(context, "picture"),
-                                                                    DoubleArgumentType.getDouble(context, "x"),
-                                                                    DoubleArgumentType.getDouble(context, "y"),
-                                                                    DoubleArgumentType.getDouble(context, "z")))
+                                                            .executes(context -> create(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture"),
+                                                                    DoubleArgumentType.getDouble(context, "x"), DoubleArgumentType.getDouble(context, "y"), DoubleArgumentType.getDouble(context, "z")))
                                                             .then(Commands.argument("width", IntegerArgumentType.integer(1, 16))
                                                                     .then(Commands.argument("height", IntegerArgumentType.integer(1, 16))
-                                                                            .executes(context -> create(context.getSource().getPlayerOrException(),
-                                                                                    StringArgumentType.getString(context, "picture"),
-                                                                                    DoubleArgumentType.getDouble(context, "x"),
-                                                                                    DoubleArgumentType.getDouble(context, "y"),
-                                                                                    DoubleArgumentType.getDouble(context, "z"),
-                                                                                    IntegerArgumentType.getInteger(context, "width"),
-                                                                                    IntegerArgumentType.getInteger(context, "height"))))))))
+                                                                            .executes(context -> create(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture"),
+                                                                                    DoubleArgumentType.getDouble(context, "x"), DoubleArgumentType.getDouble(context, "y"), DoubleArgumentType.getDouble(context, "z"),
+                                                                                    IntegerArgumentType.getInteger(context, "width"), IntegerArgumentType.getInteger(context, "height"))))))))
                     .then(Commands.literal("give")
                             .then(Commands.argument("picture", StringArgumentType.word())
-                                    .executes(context -> give(context.getSource().getPlayerOrException(),
-                                            StringArgumentType.getString(context, "picture")))))
+                                    .executes(context -> give(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture")))))
                     .then(Commands.literal("remove")
                             .then(Commands.argument("display", StringArgumentType.word())
-                                    .executes(context -> remove(context.getSource().getPlayerOrException(),
-                                            StringArgumentType.getString(context, "display")))));
+                                    .executes(context -> remove(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "display")))));
             dispatcher.register(Commands.literal("wallcanvas").then(map));
         });
     }
@@ -96,9 +85,9 @@ public final class FabricMapCommands {
                 return 0;
             }
             ItemStack map = new FabricMapDisplayManager(picturesDirectory, displayStore)
-                    .create(player.serverLevel(), MapSpec.single(asset, player.getX(), player.getY(), player.getZ()), player.getYRot()) == null
-                    ? ItemStack.EMPTY : ItemStack.EMPTY;
-            player.sendSystemMessage(Component.literal("Map give is reserved for the normal filled-map item workflow; use /wallcanvas map create for automatic placement."));
+                    .createMapItem(player.serverLevel(), asset);
+            if (!player.getInventory().add(map)) player.drop(map, false);
+            player.sendSystemMessage(Component.literal("Gave WallCanvas Map for '" + asset + "'."));
             return 1;
         } catch (Exception exception) {
             player.sendSystemMessage(Component.literal("Unable to create map: " + safeMessage(exception)));
