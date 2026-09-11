@@ -36,7 +36,6 @@ public final class WallCanvasFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         ServerLifecycleEvents.SERVER_STARTING.register(this::onServerStarting);
-        FabricMapCommands.register();
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             var wallCanvas = Commands.literal("wallcanvas");
 
@@ -81,6 +80,7 @@ public final class WallCanvasFabric implements ModInitializer {
             var givePlayer = Commands.argument("player", EntityArgument.player()).then(givePicture);
             wallCanvas.then(Commands.literal("give").then(givePlayer));
 
+            wallCanvas.then(FabricMapCommands.mapCommand());
             dispatcher.register(wallCanvas);
         });
     }
