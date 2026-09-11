@@ -9,6 +9,7 @@ base {
 dependencies {
     compileOnly "io.papermc.paper:paper-api:${project.paper_api_version}"
     implementation project(':wallcanvas-core')
+    implementation 'org.sejda.imageio:webp-imageio:0.1.6'
 }
 
 processResources {
@@ -20,4 +21,10 @@ processResources {
 
 jar {
     from(project(':wallcanvas-core').sourceSets.main.output)
+    dependsOn configurations.runtimeClasspath
+    from {
+        configurations.runtimeClasspath
+                .filter { it.name.contains('webp-imageio') }
+                .collect { zipTree(it) }
+    }
 }
