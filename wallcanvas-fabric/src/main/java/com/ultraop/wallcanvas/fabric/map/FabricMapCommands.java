@@ -3,12 +3,12 @@ package com.ultraop.wallcanvas.fabric.map;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.map.MapSpec;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -32,55 +32,52 @@ public final class FabricMapCommands {
         displayStore = store;
     }
 
-    public static void register() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            SuggestionProvider<CommandSourceStack> pictureSuggestions = (context, builder) -> {
-                try {
-                    for (Path path : ImageLibrary.scan(picturesDirectory)) {
-                        builder.suggest(path.getFileName().toString());
-                    }
-                } catch (Exception ignored) {
+    public static LiteralArgumentBuilder<CommandSourceStack> mapCommand() {
+        SuggestionProvider<CommandSourceStack> pictureSuggestions = (context, builder) -> {
+            try {
+                for (Path path : ImageLibrary.scan(picturesDirectory)) {
+                    builder.suggest(path.getFileName().toString());
                 }
-                return builder.buildFuture();
-            };
+            } catch (Exception ignored) {
+            }
+            return builder.buildFuture();
+        };
 
-            var createPicture = Commands.argument("picture", StringArgumentType.word())
-                    .suggests(pictureSuggestions)
-                    .executes(context -> create(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture")));
+        var createPicture = Commands.argument("picture", StringArgumentType.word())
+                .suggests(pictureSuggestions)
+                .executes(context -> create(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture")));
 
-            var height = Commands.argument("height", IntegerArgumentType.integer(1, 16))
-                    .executes(context -> create(context.getSource().getPlayerOrException(),
-                            StringArgumentType.getString(context, "picture"),
-                            DoubleArgumentType.getDouble(context, "x"),
-                            DoubleArgumentType.getDouble(context, "y"),
-                            DoubleArgumentType.getDouble(context, "z"),
-                            IntegerArgumentType.getInteger(context, "width"),
-                            IntegerArgumentType.getInteger(context, "height")));
-            var width = Commands.argument("width", IntegerArgumentType.integer(1, 16)).then(height);
-            var z = Commands.argument("z", DoubleArgumentType.doubleArg())
-                    .executes(context -> create(context.getSource().getPlayerOrException(),
-                            StringArgumentType.getString(context, "picture"),
-                            DoubleArgumentType.getDouble(context, "x"),
-                            DoubleArgumentType.getDouble(context, "y"),
-                            DoubleArgumentType.getDouble(context, "z")))
-                    .then(width);
-            var y = Commands.argument("y", DoubleArgumentType.doubleArg()).then(z);
-            var x = Commands.argument("x", DoubleArgumentType.doubleArg()).then(y);
-            createPicture.then(x);
-            var create = Commands.literal("create").then(createPicture);
+        var height = Commands.argument("height", IntegerArgumentType.integer(1, 16))
+                .executes(context -> create(context.getSource().getPlayerOrException(),
+                        StringArgumentType.getString(context, "picture"),
+                        DoubleArgumentType.getDouble(context, "x"),
+                        DoubleArgumentType.getDouble(context, "y"),
+                        DoubleArgumentType.getDouble(context, "z"),
+                        IntegerArgumentType.getInteger(context, "width"),
+                        IntegerArgumentType.getInteger(context, "height")));
+        var width = Commands.argument("width", IntegerArgumentType.integer(1, 16)).then(height);
+        var z = Commands.argument("z", DoubleArgumentType.doubleArg())
+                .executes(context -> create(context.getSource().getPlayerOrException(),
+                        StringArgumentType.getString(context, "picture"),
+                        DoubleArgumentType.getDouble(context, "x"),
+                        DoubleArgumentType.getDouble(context, "y"),
+                        DoubleArgumentType.getDouble(context, "z")))
+                .then(width);
+        var y = Commands.argument("y", DoubleArgumentType.doubleArg()).then(z);
+        var x = Commands.argument("x", DoubleArgumentType.doubleArg()).then(y);
+        createPicture.then(x);
+        var create = Commands.literal("create").then(createPicture);
 
-            var givePicture = Commands.argument("picture", StringArgumentType.word())
-                    .suggests(pictureSuggestions)
-                    .executes(context -> give(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture")));
-            var give = Commands.literal("give").then(givePicture);
+        var givePicture = Commands.argument("picture", StringArgumentType.word())
+                .suggests(pictureSuggestions)
+                .executes(context -> give(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture")));
+        var give = Commands.literal("give").then(givePicture);
 
-            var display = Commands.argument("display", StringArgumentType.word())
-                    .executes(context -> remove(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "display")));
-            var remove = Commands.literal("remove").then(display);
+        var display = Commands.argument("display", StringArgumentType.word())
+                .executes(context -> remove(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "display")));
+        var remove = Commands.literal("remove").then(display);
 
-            var map = Commands.literal("map").then(create).then(give).then(remove);
-            dispatcher.register(Commands.literal("wallcanvas").then(map));
-        });
+        return Commands.literal("map").then(create).then(give).then(remove);
     }
 
     private static int create(ServerPlayer player, String asset) {
