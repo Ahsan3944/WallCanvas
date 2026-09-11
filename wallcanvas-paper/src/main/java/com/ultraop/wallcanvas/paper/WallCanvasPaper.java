@@ -8,6 +8,7 @@ import com.ultraop.wallcanvas.core.map.MapSpec;
 import com.ultraop.wallcanvas.core.painting.PaintingPackBuilder;
 import com.ultraop.wallcanvas.core.painting.PaintingResourcePackArchive;
 import com.ultraop.wallcanvas.core.painting.PaintingSize;
+import com.ultraop.wallcanvas.core.painting.PaintingSizeStore;
 import com.ultraop.wallcanvas.core.painting.PaintingSpec;
 import com.ultraop.wallcanvas.paper.map.PaperMapDisplayManager;
 import com.ultraop.wallcanvas.paper.painting.PaperPaintingItems;
@@ -35,6 +36,7 @@ import java.util.concurrent.CompletableFuture;
 
 public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor, org.bukkit.command.TabCompleter, Listener {
     private Path picturesDirectory;
+    private PaintingSizeStore paintingSizeStore;
     private PaperPaintingItems paintingItems;
     private DisplayStore displayStore;
     private PaperMapDisplayManager mapManager;
@@ -43,9 +45,12 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
 
     @Override
     public void onLoad() {
-        picturesDirectory = getDataFolder().toPath().resolve("pictures");
         try {
+            Path worldRoot = resolveDefaultWorldRoot();
+            picturesDirectory = worldRoot.resolve("wallcanvas").resolve("pictures").normalize();
             Files.createDirectories(picturesDirectory);
+            paintingSizeStore = new PaintingSizeStore(worldRoot.resolve("wallcanvas").resolve("painting-sizes.json"));
+            paintingSizeStore.load();
             saveDefaultConfig();
             rebuildGeneratedPacks();
         } catch (IOException exception) {
@@ -55,13 +60,13 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
 
     @Override
     public void onEnable() {
-        if (picturesDirectory == null) {
+        if (picturesDirectory == null || paintingSizeStore == null) {
             getLogger().severe("WallCanvas resources were not initialized during onLoad; disabling plugin.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
 
-        displayStore = new DisplayStore(getDataFolder().toPath().resolve("displays.json"));
+        displayStore = new DisplayStore(resolveDefaultWorldRootUnchecked().resolve("wallcanvas").resolve("displays.json"));
         try {
             displayStore.load();
         } catch (IOException exception) {
@@ -87,6 +92,7 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
 
         getLogger().info(WallCanvasCore.NAME + " initialized. Picture library: " + picturesDirectory);
         getLogger().info("Loaded " + displayStore.all().size() + " persistent display(s).");
+        getLogger().info("Painting sizes: " + paintingSizeStore.all());
     }
 
     @EventHandler
@@ -126,7 +132,7 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
                     rebuildGeneratedPacks();
                     Bukkit.getScheduler().runTask(this, () -> sender.sendMessage(
                             "Imported '" + imported.getFileName()
-                                    + "'. Restart the server to register the new Painting variant."));
+                                    + "'. Restart the server to register new Painting variants."));
                 } catch (Exception exception) {
                     Bukkit.getScheduler().runTask(this, () -> sender.sendMessage(
                             "Web import failed: " + safeMessage(exception)));
@@ -142,95 +148,86 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
             if (!isPictureFile(picturesDirectory.resolve(pictureName).normalize())) {
                 sender.sendMessage("Picture not found."); return true;
             }
+
+            PaintingSize size;
             try {
-                target.getInventory().addItem(paintingItems.create(new PaintingSpec(pictureName, PaintingSize.DEFAULT)));
-                sender.sendMessage("Gave WallCanvas Painting '" + pictureName + "' to " + target.getName() + ".");
+                size = parsePaintingSize(args, 3);
+            } catch (IllegalArgumentException exception) {
+                sender.sendMessage(exception.getMessage());
+                return true;
+            }
+
+            if (!paintingSizeStore.contains(size)) {
+                try {
+                    paintingSizeStore.add(size);
+                    rebuildGeneratedPacks();
+                    sender.sendMessage("Registered Painting size " + size + ". Restart the server before using it.");
+                } catch (IOException exception) {
+                    sender.sendMessage("Unable to register Painting size: " + safeMessage(exception));
+                }
+                return true;
+            }
+
+            try {
+                target.getInventory().addItem(paintingItems.create(new PaintingSpec(pictureName, size)));
+                sender.sendMessage("Gave WallCanvas Painting '" + pictureName + "' ("
+                        + size.widthBlocks() + "x" + size.heightBlocks() + " blocks, "
+                        + size.pixelsPerBlock() + " px/block) to " + target.getName() + ".");
             } catch (IllegalStateException exception) {
                 sender.sendMessage("Painting variant is not registered yet: " + exception.getMessage());
             }
             return true;
         }
 
-        if (args[0].equalsIgnoreCase("map")) {
-            return handleMapCommand(sender, args);
-        }
+        if (args[0].equalsIgnoreCase("map")) return handleMapCommand(sender, args);
 
-        sender.sendMessage("Usage: /wallcanvas list | /wallcanvas info <picture> | /wallcanvas create web <name> <url> | /wallcanvas give <player> <picture> | /wallcanvas map <create|give|remove> ...");
+        sender.sendMessage("Usage: /wallcanvas list | /wallcanvas info <picture> | /wallcanvas create web <name> <url> | /wallcanvas give <player> <picture> [width height [pixels-per-block]] | /wallcanvas map <create|give|remove> ...");
         return true;
+    }
+
+    private PaintingSize parsePaintingSize(String[] args, int index) {
+        if (args.length == index) return PaintingSize.DEFAULT;
+        if (args.length != index + 2 && args.length != index + 3) {
+            throw new IllegalArgumentException("Usage: /wallcanvas give <player> <picture> [width height [pixels-per-block]]");
+        }
+        try {
+            int width = Integer.parseInt(args[index]);
+            int height = Integer.parseInt(args[index + 1]);
+            int pixels = args.length == index + 3 ? Integer.parseInt(args[index + 2]) : PaintingSize.DEFAULT_PIXELS_PER_BLOCK;
+            return PaintingSize.of(width, height, pixels);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException("Width, height and pixels-per-block must be integers.");
+        }
     }
 
     private boolean handleMapCommand(CommandSender sender, String[] args) {
         if (args.length >= 2 && args[1].equalsIgnoreCase("give")) {
-            if (!(sender instanceof Player player)) {
-                sender.sendMessage("A player must use /wallcanvas map give.");
-                return true;
-            }
-            if (args.length < 3 || !isPictureFile(picturesDirectory.resolve(args[2]).normalize())) {
-                sender.sendMessage("Usage: /wallcanvas map give <picture>");
-                return true;
-            }
-            try {
-                player.getInventory().addItem(mapManager.createMapItem(player.getWorld(), args[2]));
-                sender.sendMessage("Gave WallCanvas Map for '" + args[2] + "'.");
-            } catch (IOException exception) {
-                sender.sendMessage("Unable to create map: " + safeMessage(exception));
-            }
+            if (!(sender instanceof Player player)) { sender.sendMessage("A player must use /wallcanvas map give."); return true; }
+            if (args.length < 3 || !isPictureFile(picturesDirectory.resolve(args[2]).normalize())) { sender.sendMessage("Usage: /wallcanvas map give <picture>"); return true; }
+            try { player.getInventory().addItem(mapManager.createMapItem(player.getWorld(), args[2])); sender.sendMessage("Gave WallCanvas Map for '" + args[2] + "'."); }
+            catch (IOException exception) { sender.sendMessage("Unable to create map: " + safeMessage(exception)); }
             return true;
         }
-
         if (args.length >= 2 && args[1].equalsIgnoreCase("create")) {
-            if (!(sender instanceof Player player)) {
-                sender.sendMessage("A player must use /wallcanvas map create.");
-                return true;
-            }
-            if (args.length < 3 || !isPictureFile(picturesDirectory.resolve(args[2]).normalize())) {
-                sender.sendMessage("Usage: /wallcanvas map create <picture> [x y z] [width height]");
-                return true;
-            }
+            if (!(sender instanceof Player player)) { sender.sendMessage("A player must use /wallcanvas map create."); return true; }
+            if (args.length < 3 || !isPictureFile(picturesDirectory.resolve(args[2]).normalize())) { sender.sendMessage("Usage: /wallcanvas map create <picture> [x y z] [width height]"); return true; }
             try {
-                String asset = args[2];
-                double x = player.getX();
-                double y = player.getY();
-                double z = player.getZ();
-                int width = 1;
-                int height = 1;
-                if (args.length >= 6) {
-                    x = Double.parseDouble(args[3]);
-                    y = Double.parseDouble(args[4]);
-                    z = Double.parseDouble(args[5]);
-                }
-                if (args.length >= 8) {
-                    width = Integer.parseInt(args[6]);
-                    height = Integer.parseInt(args[7]);
-                }
-                MapSpec spec = new MapSpec(asset, width, height, x, y, z);
-                UUID id = mapManager.create(() -> player.getWorld(), spec, player.getYaw());
-                sender.sendMessage("Created WallCanvas Map display " + id + " at "
-                        + x + ", " + y + ", " + z + " (" + width + "x" + height + ").");
-            } catch (NumberFormatException exception) {
-                sender.sendMessage("Coordinates and map size must be valid numbers.");
-            } catch (IllegalArgumentException | IOException exception) {
-                sender.sendMessage("Unable to create map: " + safeMessage(exception));
-            }
+                String asset = args[2]; double x = player.getX(); double y = player.getY(); double z = player.getZ(); int width = 1; int height = 1;
+                if (args.length >= 6) { x = Double.parseDouble(args[3]); y = Double.parseDouble(args[4]); z = Double.parseDouble(args[5]); }
+                if (args.length >= 8) { width = Integer.parseInt(args[6]); height = Integer.parseInt(args[7]); }
+                UUID id = mapManager.create(() -> player.getWorld(), new MapSpec(asset, width, height, x, y, z), player.getYaw());
+                sender.sendMessage("Created WallCanvas Map display " + id + " at " + x + ", " + y + ", " + z + " (" + width + "x" + height + ").");
+            } catch (NumberFormatException exception) { sender.sendMessage("Coordinates and map size must be valid numbers."); }
+            catch (IllegalArgumentException | IOException exception) { sender.sendMessage("Unable to create map: " + safeMessage(exception)); }
             return true;
         }
-
         if (args.length >= 2 && args[1].equalsIgnoreCase("remove")) {
-            if (args.length < 3) {
-                sender.sendMessage("Usage: /wallcanvas map remove <display-uuid>");
-                return true;
-            }
-            try {
-                int removed = mapManager.remove(UUID.fromString(args[2]));
-                sender.sendMessage("Removed " + removed + " map display entity(s).");
-            } catch (IllegalArgumentException exception) {
-                sender.sendMessage("Invalid display UUID.");
-            } catch (IOException exception) {
-                sender.sendMessage("Unable to remove map: " + safeMessage(exception));
-            }
+            if (args.length < 3) { sender.sendMessage("Usage: /wallcanvas map remove <display-uuid>"); return true; }
+            try { int removed = mapManager.remove(UUID.fromString(args[2])); sender.sendMessage("Removed " + removed + " map display entity(s)."); }
+            catch (IllegalArgumentException exception) { sender.sendMessage("Invalid display UUID."); }
+            catch (IOException exception) { sender.sendMessage("Unable to remove map: " + safeMessage(exception)); }
             return true;
         }
-
         sender.sendMessage("Usage: /wallcanvas map create <picture> [x y z] [width height] | /wallcanvas map give <picture> | /wallcanvas map remove <display-uuid>");
         return true;
     }
@@ -242,9 +239,18 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
         if (args.length == 2 && args[0].equalsIgnoreCase("create")) return filter(List.of("web"), args[1]);
         if (args.length == 2 && args[0].equalsIgnoreCase("give")) return filter(Bukkit.getOnlinePlayers().stream().map(Player::getName).toList(), args[1]);
         if (args.length == 3 && args[0].equalsIgnoreCase("give")) return pictureNames(args[2]);
+        if (args.length == 4 && args[0].equalsIgnoreCase("give")) return numberSuggestions(args[3], 1, 16);
+        if (args.length == 5 && args[0].equalsIgnoreCase("give")) return numberSuggestions(args[4], 1, 16);
+        if (args.length == 6 && args[0].equalsIgnoreCase("give")) return filter(List.of("4", "8", "16", "32", "64", "128", "256"), args[5]);
         if (args.length == 2 && args[0].equalsIgnoreCase("map")) return filter(List.of("create", "give", "remove"), args[1]);
         if (args.length == 3 && args[0].equalsIgnoreCase("map") && (args[1].equalsIgnoreCase("create") || args[1].equalsIgnoreCase("give"))) return pictureNames(args[2]);
         return List.of();
+    }
+
+    private List<String> numberSuggestions(String prefix, int min, int max) {
+        List<String> values = new ArrayList<>();
+        for (int i = min; i <= max; i++) values.add(Integer.toString(i));
+        return filter(values, prefix);
     }
 
     private List<String> pictureNames(String prefix) {
@@ -258,44 +264,40 @@ public final class WallCanvasPaper extends JavaPlugin implements CommandExecutor
     }
 
     private static List<String> filter(List<String> values, String prefix) {
-        String lower = prefix.toLowerCase(Locale.ROOT);
-        List<String> result = new ArrayList<>();
+        String lower = prefix.toLowerCase(Locale.ROOT); List<String> result = new ArrayList<>();
         for (String value : values) if (value.toLowerCase(Locale.ROOT).startsWith(lower)) result.add(value);
         return result;
     }
 
     private void rebuildGeneratedPacks() throws IOException {
-        Path packRoot = PaintingPackBuilder.defaultPackRoot(getDataFolder().toPath());
+        Path packRoot = getDataFolder().toPath().resolve("generated").resolve("resourcepack");
         Path worldRoot = resolveDefaultWorldRoot();
-        PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot,
-                PaintingPackBuilder.defaultDataPackRoot(worldRoot));
+        PaintingPackBuilder.rebuildAll(picturesDirectory, packRoot, PaintingPackBuilder.defaultDataPackRoot(worldRoot), paintingSizeStore.all());
         Path archive = PaintingResourcePackArchive.zip(packRoot);
         String sha1 = PaintingResourcePackArchive.sha1Hex(archive);
         resourcePackHash = java.util.HexFormat.of().parseHex(sha1);
         resourcePackUrl = getConfig().getString("resource-pack.url", "").trim();
         getLogger().info("Generated WallCanvas resource/data packs: " + archive + " (SHA-1 " + sha1 + ")");
-        if (resourcePackUrl.isBlank()) {
-            getLogger().warning("resource-pack.url is not configured; players will not receive the generated pack automatically.");
-        }
+        if (resourcePackUrl.isBlank()) getLogger().warning("resource-pack.url is not configured; players will not receive the generated pack automatically.");
     }
 
     private static String safeMessage(Exception exception) {
-        String message = exception.getMessage();
-        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
+        String message = exception.getMessage(); return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
 
     private Path resolveDefaultWorldRoot() throws IOException {
         Path container = getServer().getWorldContainer().toPath();
-        Path propertiesFile = container.resolve("server.properties");
-        String levelName = "world";
+        Path propertiesFile = container.resolve("server.properties"); String levelName = "world";
         if (Files.isRegularFile(propertiesFile)) {
             Properties properties = new Properties();
-            try (var input = Files.newInputStream(propertiesFile)) {
-                properties.load(input);
-            }
-            String configured = properties.getProperty("level-name", "world").trim();
-            if (!configured.isBlank()) levelName = configured;
+            try (var input = Files.newInputStream(propertiesFile)) { properties.load(input); }
+            String configured = properties.getProperty("level-name", "world").trim(); if (!configured.isBlank()) levelName = configured;
         }
         return container.resolve(Paths.get(levelName)).normalize();
+    }
+
+    private Path resolveDefaultWorldRootUnchecked() {
+        try { return resolveDefaultWorldRoot(); }
+        catch (IOException exception) { throw new IllegalStateException("Unable to resolve world root", exception); }
     }
 }
