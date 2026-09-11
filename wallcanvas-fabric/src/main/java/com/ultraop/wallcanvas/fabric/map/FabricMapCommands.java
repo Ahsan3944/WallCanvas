@@ -3,11 +3,13 @@ package com.ultraop.wallcanvas.fabric.map;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.WallCanvasCore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.map.MapSpec;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -32,7 +34,18 @@ public final class FabricMapCommands {
 
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            SuggestionProvider<CommandSourceStack> pictureSuggestions = (context, builder) -> {
+                try {
+                    for (Path path : ImageLibrary.scan(picturesDirectory)) {
+                        builder.suggest(path.getFileName().toString());
+                    }
+                } catch (Exception ignored) {
+                }
+                return builder.buildFuture();
+            };
+
             var createPicture = Commands.argument("picture", StringArgumentType.word())
+                    .suggests(pictureSuggestions)
                     .executes(context -> create(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture")));
 
             var height = Commands.argument("height", IntegerArgumentType.integer(1, 16))
@@ -57,6 +70,7 @@ public final class FabricMapCommands {
             var create = Commands.literal("create").then(createPicture);
 
             var givePicture = Commands.argument("picture", StringArgumentType.word())
+                    .suggests(pictureSuggestions)
                     .executes(context -> give(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "picture")));
             var give = Commands.literal("give").then(givePicture);
 
