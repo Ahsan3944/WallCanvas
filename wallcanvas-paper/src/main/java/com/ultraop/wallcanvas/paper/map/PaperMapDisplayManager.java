@@ -3,6 +3,7 @@ package com.ultraop.wallcanvas.paper.map;
 import com.ultraop.wallcanvas.core.DisplayStore;
 import com.ultraop.wallcanvas.core.library.ImageLibrary;
 import com.ultraop.wallcanvas.core.map.MapImageRenderer;
+import com.ultraop.wallcanvas.core.map.MapPlacement;
 import com.ultraop.wallcanvas.core.map.MapSpec;
 import com.ultraop.wallcanvas.core.model.DisplayDefinition;
 import io.papermc.paper.datacomponent.DataComponentTypes;
@@ -74,15 +75,10 @@ public final class PaperMapDisplayManager {
                     ItemStack item = new ItemStack(Material.FILLED_MAP);
                     item.setData(DataComponentTypes.MAP_ID, MapId.mapId(map.getId()));
 
-                    double yawRad = Math.toRadians(yaw);
-                    double rightX = Math.cos(yawRad);
-                    double rightZ = -Math.sin(yawRad);
-                    double xOffset = (tileX - (spec.tilesWide() - 1) / 2.0);
-                    double yOffset = ((spec.tilesHigh() - 1) / 2.0 - tileY);
                     Location location = new Location(player.world(),
-                            spec.centerX() + rightX * xOffset,
-                            spec.centerY() + yOffset,
-                            spec.centerZ() + rightZ * xOffset,
+                            MapPlacement.x(spec.centerX(), yaw, tileX, spec.tilesWide()),
+                            MapPlacement.y(spec.centerY(), tileY, spec.tilesHigh()),
+                            MapPlacement.z(spec.centerZ(), yaw, tileX, spec.tilesWide()),
                             yaw, 0);
 
                     ItemDisplay display = (ItemDisplay) player.world().spawnEntity(location, EntityType.ITEM_DISPLAY);
