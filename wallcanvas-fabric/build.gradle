@@ -13,6 +13,9 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
     implementation project(path: ':wallcanvas-core')
+    include project(path: ':wallcanvas-core')
+    implementation 'org.sejda.imageio:webp-imageio:0.1.6'
+    include 'org.sejda.imageio:webp-imageio:0.1.6'
 }
 
 loom {
