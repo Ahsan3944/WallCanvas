@@ -72,13 +72,18 @@ public final class WallCanvasFabric implements ModInitializer {
                     .executes(context -> givePainting(context.getSource(), EntityArgument.getPlayer(context, "player"),
                             StringArgumentType.getString(context, "picture"), PaintingSize.DEFAULT));
             var width = Commands.argument("width", IntegerArgumentType.integer(1, 16));
-            var height = Commands.argument("height", IntegerArgumentType.integer(1, 16));
-            var pixels = Commands.argument("pixels-per-block", IntegerArgumentType.integer(4, 256));
-            var sized = pixels.executes(context -> givePainting(context.getSource(), EntityArgument.getPlayer(context, "player"),
-                    StringArgumentType.getString(context, "picture"), PaintingSize.of(
-                            IntegerArgumentType.getInteger(context, "width"), IntegerArgumentType.getInteger(context, "height"),
-                            IntegerArgumentType.getInteger(context, "pixels-per-block"))));
-            height.then(sized);
+            var height = Commands.argument("height", IntegerArgumentType.integer(1, 16))
+                    .executes(context -> givePainting(context.getSource(), EntityArgument.getPlayer(context, "player"),
+                            StringArgumentType.getString(context, "picture"), PaintingSize.of(
+                                    IntegerArgumentType.getInteger(context, "width"),
+                                    IntegerArgumentType.getInteger(context, "height"))));
+            var pixels = Commands.argument("pixels-per-block", IntegerArgumentType.integer(4, 256))
+                    .executes(context -> givePainting(context.getSource(), EntityArgument.getPlayer(context, "player"),
+                            StringArgumentType.getString(context, "picture"), PaintingSize.of(
+                                    IntegerArgumentType.getInteger(context, "width"),
+                                    IntegerArgumentType.getInteger(context, "height"),
+                                    IntegerArgumentType.getInteger(context, "pixels-per-block"))));
+            height.then(pixels);
             width.then(height);
             givePicture.then(width);
             var givePlayer = Commands.argument("player", EntityArgument.player()).then(givePicture);
