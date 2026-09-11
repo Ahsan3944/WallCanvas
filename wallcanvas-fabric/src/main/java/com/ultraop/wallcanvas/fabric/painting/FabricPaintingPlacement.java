@@ -47,17 +47,15 @@ public final class FabricPaintingPlacement {
 
             Set<UUID> existing = new HashSet<>();
             for (Painting painting : level.getEntitiesOfClass(Painting.class,
-                    player.getBoundingBox().inflate(4.0))) {
-                existing.add(painting.getUUID());
-            }
+                    player.getBoundingBox().inflate(4.0))) existing.add(painting.getUUID());
 
             var tag = stack.get(DataComponents.CUSTOM_DATA).copyTag();
             String asset = tag.getString(PaintingMetadata.ASSET).orElse("");
             String size = tag.getString(PaintingMetadata.SIZE).orElse("");
             if (asset.isBlank() || size.isBlank()) return InteractionResult.PASS;
 
-            pending.put(serverPlayer.getUUID(), new PendingPlacement(
-                    serverPlayer.getUUID(), level, hit.getBlockPos(), existing, asset, size));
+            pending.put(serverPlayer.getUUID(), new PendingPlacement(serverPlayer.getUUID(), level,
+                    hit.getBlockPos(), existing, asset, size));
             return InteractionResult.PASS;
         });
 
@@ -69,23 +67,22 @@ public final class FabricPaintingPlacement {
             var display = displayStore.find(painting.getUUID()).orElse(null);
             if (display == null || !display.isPainting()) return InteractionResult.PASS;
 
-            if (!serverPlayer.isCreative()) {
-                PaintingSize size = sizeFor(painting, display);
-                ItemStack item = paintingItems.create(
-                        new PaintingSpec(display.assetId(), size), level.registryAccess());
-                ItemEntity drop = new ItemEntity(level,
-                        painting.getX(), painting.getY(), painting.getZ(), item);
-                level.addFreshEntity(drop);
-            }
-
             try {
+                ItemStack item = paintingItems.create(
+                        new PaintingSpec(display.assetId(), sizeFor(painting, display)), level.registryAccess());
+                if (serverPlayer.isCreative()) {
+                    if (!serverPlayer.getInventory().add(item)) {
+                        level.addFreshEntity(new ItemEntity(level, painting.getX(), painting.getY(), painting.getZ(), item));
+                    }
+                } else {
+                    level.addFreshEntity(new ItemEntity(level, painting.getX(), painting.getY(), painting.getZ(), item));
+                }
                 displayStore.remove(painting.getUUID());
-            } catch (IOException exception) {
+                painting.discard();
+                return InteractionResult.SUCCESS;
+            } catch (IOException | RuntimeException exception) {
                 return InteractionResult.FAIL;
             }
-
-            painting.discard();
-            return InteractionResult.SUCCESS;
         });
 
         ServerTickEvents.END_SERVER_TICK.register(server -> {
@@ -95,22 +92,16 @@ public final class FabricPaintingPlacement {
                     pending.remove(request.playerId());
                     continue;
                 }
-
                 Painting found = null;
                 for (Painting painting : request.level().getEntitiesOfClass(Painting.class,
                         new AABB(request.blockPos()).inflate(5.0))) {
-                    if (!request.existing().contains(painting.getUUID())) {
-                        found = painting;
-                        break;
-                    }
+                    if (!request.existing().contains(painting.getUUID())) { found = painting; break; }
                 }
                 if (found == null) continue;
-
                 try {
                     var variant = found.getVariant().value();
                     found.addTag(SIZE_TAG_PREFIX + request.size());
-                    displayStore.add(DisplayDefinition.painting(
-                            found.getUUID(), request.assetId(),
+                    displayStore.add(DisplayDefinition.painting(found.getUUID(), request.assetId(),
                             Math.max(1, variant.width()), Math.max(1, variant.height())));
                 } catch (IOException exception) {
                     found.discard();
@@ -123,15 +114,10 @@ public final class FabricPaintingPlacement {
     private static PaintingSize sizeFor(Painting painting, DisplayDefinition display) {
         for (String tag : painting.getTags()) {
             if (!tag.startsWith(SIZE_TAG_PREFIX)) continue;
-            try {
-                return PaintingSize.fromName(tag.substring(SIZE_TAG_PREFIX.length()));
-            } catch (IllegalArgumentException ignored) {
-                break;
-            }
+            try { return PaintingSize.fromName(tag.substring(SIZE_TAG_PREFIX.length())); }
+            catch (IllegalArgumentException ignored) { break; }
         }
-        return display.width() >= PaintingSize.LARGE.widthBlocks()
-                ? PaintingSize.LARGE
-                : PaintingSize.DEFAULT;
+        return display.width() >= PaintingSize.LARGE.widthBlocks() ? PaintingSize.LARGE : PaintingSize.DEFAULT;
     }
 
     private static boolean isWallCanvasItem(ItemStack stack) {
@@ -143,6 +129,5 @@ public final class FabricPaintingPlacement {
     }
 
     private record PendingPlacement(UUID playerId, ServerLevel level, BlockPos blockPos,
-                                    Set<UUID> existing, String assetId, String size) {
-    }
+                                    Set<UUID> existing, String assetId, String size) {}
 }
