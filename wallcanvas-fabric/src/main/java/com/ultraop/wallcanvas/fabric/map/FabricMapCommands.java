@@ -83,7 +83,7 @@ public final class FabricMapCommands {
                 return 0;
             }
             UUID id = new FabricMapDisplayManager(picturesDirectory, displayStore)
-                    .create(player.serverLevel(), new MapSpec(asset, width, height, x, y, z), player.getYRot());
+                    .create(player.level().getLevel(), new MapSpec(asset, width, height, x, y, z), player.getYRot());
             player.sendSystemMessage(Component.literal("Created WallCanvas Map display " + id + "."));
             return 1;
         } catch (Exception exception) {
@@ -98,7 +98,7 @@ public final class FabricMapCommands {
                 player.sendSystemMessage(Component.literal("Picture not found."));
                 return 0;
             }
-            ItemStack map = new FabricMapDisplayManager(picturesDirectory, displayStore).createMapItem(player.serverLevel(), asset);
+            ItemStack map = new FabricMapDisplayManager(picturesDirectory, displayStore).createMapItem(player.level().getLevel(), asset);
             if (!player.getInventory().add(map)) player.drop(map, false);
             player.sendSystemMessage(Component.literal("Gave WallCanvas Map for '" + asset + "'."));
             return 1;
@@ -111,7 +111,7 @@ public final class FabricMapCommands {
     private static int remove(ServerPlayer player, String rawId) {
         try {
             UUID id = UUID.fromString(rawId);
-            int removed = new FabricMapDisplayManager(picturesDirectory, displayStore).remove(player.serverLevel(), id);
+            int removed = new FabricMapDisplayManager(picturesDirectory, displayStore).remove(player.level().getLevel(), id);
             player.sendSystemMessage(Component.literal("Removed " + removed + " map display entity(s)."));
             return 1;
         } catch (IllegalArgumentException exception) {
