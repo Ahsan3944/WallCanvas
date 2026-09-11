@@ -95,7 +95,7 @@ public final class FabricMapDisplayManager {
 
     public int remove(ServerLevel world, UUID displayId) throws IOException {
         int removed = 0;
-        for (Entity entity : new ArrayList<>(world.getAllEntities())) {
+        for (Entity entity : world.getAllEntities()) {
             if (!(entity instanceof Display.ItemDisplay display)) continue;
             if (hasDisplayId(display, displayId)) {
                 display.discard();
