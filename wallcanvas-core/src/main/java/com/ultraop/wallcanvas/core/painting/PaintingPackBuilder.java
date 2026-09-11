@@ -30,9 +30,18 @@ public final class PaintingPackBuilder {
 
     public static List<PaintingVariantDefinition> rebuildAll(Path picturesDirectory, Path packRoot,
                                                                Path dataPackRoot) throws IOException {
+        return rebuildAll(picturesDirectory, packRoot, dataPackRoot,
+                List.of(PaintingSize.DEFAULT, PaintingSize.LARGE));
+    }
+
+    public static List<PaintingVariantDefinition> rebuildAll(Path picturesDirectory, Path packRoot,
+                                                               Path dataPackRoot,
+                                                               List<PaintingSize> sizes) throws IOException {
         List<PaintingVariantDefinition> all = new ArrayList<>();
-        all.addAll(rebuild(picturesDirectory, packRoot, PaintingSize.DEFAULT));
-        all.addAll(rebuild(picturesDirectory, packRoot, PaintingSize.LARGE));
+        for (PaintingSize size : sizes) {
+            if (size == null) continue;
+            all.addAll(rebuild(picturesDirectory, packRoot, size));
+        }
         PaintingDataPackGenerator.generate(dataPackRoot, all);
         return List.copyOf(all);
     }
